@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gedhub/core/app_providers.dart';
 import 'package:gedhub/core/theme/app_theme.dart';
 import 'package:gedhub/features/devtools/presentation/devtools_page.dart';
 import 'package:gedhub/features/home/presentation/home_page.dart';
@@ -17,15 +18,18 @@ void main() {
 
 final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
-class GedhubApp extends StatelessWidget {
+class GedhubApp extends ConsumerWidget {
   const GedhubApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp(
       navigatorKey: _navigatorKey,
       title: 'GedHub',
       theme: AppTheme.theme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
       builder: (context, child) => DevtoolsGestureOverlay(
         navigatorKey: _navigatorKey,
         child: child ?? const SizedBox(),

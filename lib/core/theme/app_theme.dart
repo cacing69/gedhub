@@ -120,4 +120,121 @@ class AppTheme {
       ),
     );
   }
+
+  // --- Warna netral ala shadcn (dark)
+  static const Color _darkBackground = Color(0xFF0A0A0A);
+  static const Color _darkForeground = Color(0xFFFAFAFA);
+  static const Color _darkCard = Color(0xFF171717);
+  static const Color _darkBorder = Color(0xFF262626);
+  static const Color _darkMuted = Color(0xFF262626);
+  static const Color _darkMutedForeground = Color(0xFFA3A3A3);
+  static const Color _darkPrimary = Color(0xFFFAFAFA);
+  static const Color _darkPrimaryForeground = Color(0xFF18181B);
+  static const Color _darkRing = Color(0xFFD4D4D4);
+
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: ColorScheme.dark(
+        surface: _darkBackground,
+        onSurface: _darkForeground,
+        surfaceContainerHighest: _darkCard,
+        outline: _darkBorder,
+        primary: _darkPrimary,
+        onPrimary: _darkPrimaryForeground,
+        secondary: _darkMuted,
+        onSecondary: _darkMutedForeground,
+        error: const Color(0xFFDC2626),
+        onError: const Color(0xFFFAFAFA),
+      ),
+      scaffoldBackgroundColor: _darkBackground,
+      cardTheme: CardThemeData(
+        color: _darkCard,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: _darkBorder, width: 1),
+        ),
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: _darkCard,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: _darkBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: _darkRing, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFDC2626)),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFDC2626), width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        labelStyle: const TextStyle(color: _darkMutedForeground, fontSize: 14),
+        hintStyle: const TextStyle(color: _darkMutedForeground, fontSize: 14),
+        errorStyle: const TextStyle(color: Color(0xFFDC2626), fontSize: 12),
+        floatingLabelStyle: const TextStyle(color: _darkForeground, fontSize: 14),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: _darkPrimary,
+          foregroundColor: _darkPrimaryForeground,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: _darkForeground,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: _darkBackground,
+        foregroundColor: _darkForeground,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: _darkCard,
+        elevation: 0,
+        height: 64,
+        indicatorColor: _darkMuted,
+        surfaceTintColor: Colors.transparent,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: _darkCard,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: _darkBorder, width: 1),
+        ),
+      ),
+    );
+  }
 }

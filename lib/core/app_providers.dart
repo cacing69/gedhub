@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:gedhub/core/database/app_database.dart';
@@ -10,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 part 'app_providers.g.dart';
 
 const String _kCurrentProjectIdKey = 'current_project_id';
+const String _kThemeModeKey = 'theme_mode';
 
 @riverpod
 Future<SharedPreferences> sharedPreferences(Ref ref) async {
@@ -51,7 +53,15 @@ class CurrentProjectId extends _$CurrentProjectId {
     try {
       final prefs = await ref.read(sharedPreferencesProvider.future);
       final saved = prefs.getInt(_kCurrentProjectIdKey);
-      if (saved != null) state = saved;
+      if (saved == null) return;
+      final repo = ref.read(projectsRepositoryProvider);
+      final project = await repo.getProjectById(saved);
+      if (project == null) {
+        state = null;
+        await prefs.remove(_kCurrentProjectIdKey);
+      } else {
+        state = saved;
+      }
     } catch (_) {}
   }
 
@@ -68,6 +78,53 @@ class CurrentProjectId extends _$CurrentProjectId {
       } else {
         await prefs.remove(_kCurrentProjectIdKey);
       }
+    } catch (_) {}
+  }
+}
+
+/// Mode tema aplikasi (light / dark / system). Disimpan di SharedPreferences
+/// agar pilihan tetap dipakai saat app dibuka kembali.
+@Riverpod(keepAlive: true)
+class ThemeModeNotifier extends _$ThemeModeNotifier {
+  @override
+  ThemeMode build() {
+    scheduleMicrotask(_loadSavedThemeMode);
+    return ThemeMode.system;
+  }
+
+  Future<void> _loadSavedThemeMode() async {
+    try {
+      final prefs = await ref.read(sharedPreferencesProvider.future);
+      final saved = prefs.getString(_kThemeModeKey);
+      // Tanpa preferensi tersimpan → ikuti tema sistem (default).
+      final mode = switch (saved) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        'system' => ThemeMode.system,
+        _ => ThemeMode.system,
+      };
+      state = mode;
+    } catch (_) {
+      state = ThemeMode.system;
+    }
+  }
+
+  /// Mengubah mode tema dan menyimpan ke SharedPreferences. Menunggu persist
+  /// selesai agar pilihan tetap dipakai saat app dibuka selanjutnya.
+  Future<void> setThemeMode(ThemeMode mode) async {
+    state = mode;
+    await _persist(mode);
+  }
+
+  Future<void> _persist(ThemeMode mode) async {
+    try {
+      final prefs = await ref.read(sharedPreferencesProvider.future);
+      final value = switch (mode) {
+        ThemeMode.light => 'light',
+        ThemeMode.dark => 'dark',
+        ThemeMode.system => 'system',
+      };
+      await prefs.setString(_kThemeModeKey, value);
     } catch (_) {}
   }
 }

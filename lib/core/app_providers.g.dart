@@ -233,7 +233,7 @@ final class CurrentProjectIdProvider
   }
 }
 
-String _$currentProjectIdHash() => r'50b51812dbc5027cbba66ddb811bbbaff6cd51a3';
+String _$currentProjectIdHash() => r'e62f5722296ec9a9d9c0e6184e2edeaac133e053';
 
 /// Project GEDCOM yang saat ini aktif (digunakan untuk operasi peoples/tree).
 /// keepAlive: true agar pilihan tetap tersimpan saat pindah tab.
@@ -250,6 +250,64 @@ abstract class _$CurrentProjectId extends $Notifier<int?> {
             as $ClassProviderElement<
               AnyNotifier<int?, int?>,
               int?,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+/// Mode tema aplikasi (light / dark / system). Disimpan di SharedPreferences.
+
+@ProviderFor(ThemeModeNotifier)
+final themeModeProvider = ThemeModeNotifierProvider._();
+
+/// Mode tema aplikasi (light / dark / system). Disimpan di SharedPreferences.
+final class ThemeModeNotifierProvider
+    extends $NotifierProvider<ThemeModeNotifier, ThemeMode> {
+  /// Mode tema aplikasi (light / dark / system). Disimpan di SharedPreferences.
+  ThemeModeNotifierProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'themeModeProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$themeModeNotifierHash();
+
+  @$internal
+  @override
+  ThemeModeNotifier create() => ThemeModeNotifier();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ThemeMode value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ThemeMode>(value),
+    );
+  }
+}
+
+String _$themeModeNotifierHash() => r'3543e8bfcb4343c20402e88eb941f316ba650529';
+
+/// Mode tema aplikasi (light / dark / system). Disimpan di SharedPreferences.
+
+abstract class _$ThemeModeNotifier extends $Notifier<ThemeMode> {
+  ThemeMode build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<ThemeMode, ThemeMode>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<ThemeMode, ThemeMode>,
+              ThemeMode,
               Object?,
               Object?
             >;

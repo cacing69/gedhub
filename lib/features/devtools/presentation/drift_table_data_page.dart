@@ -80,6 +80,10 @@ class _TableDataView extends ConsumerWidget {
       fontWeight: FontWeight.w600,
       fontSize: 12,
     );
+    final headerColor = theme.colorScheme.primaryContainer.withOpacity(0.4);
+    final oddRowColor = theme.colorScheme.surfaceContainerHighest.withOpacity(0.5);
+    final evenRowColor = theme.colorScheme.surface;
+
     return Scrollbar(
       child: SingleChildScrollView(
         scrollDirection: Axis.vertical,
@@ -88,9 +92,7 @@ class _TableDataView extends ConsumerWidget {
             scrollDirection: Axis.horizontal,
             child: DataTable(
               showCheckboxColumn: false,
-              headingRowColor: WidgetStateProperty.all(
-                theme.colorScheme.surfaceContainerHighest,
-              ),
+              headingRowColor: WidgetStateProperty.all(headerColor),
               headingTextStyle: headerStyle,
               dataTextStyle: textStyle,
               columnSpacing: 16,
@@ -102,34 +104,36 @@ class _TableDataView extends ConsumerWidget {
                     ),
                   )
                   .toList(),
-              rows: projects
-                  .map(
-                    (project) => DataRow(
-                      cells: _projectToRow(project)
-                          .map(
-                            (cell) => DataCell(
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 200,
-                                  minWidth: 48,
-                                ),
-                                child: Text(
-                                  cell,
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 2,
-                                ),
+              rows: [
+                for (var i = 0; i < projects.length; i++)
+                  DataRow(
+                    color: WidgetStateProperty.all(
+                      i.isEven ? evenRowColor : oddRowColor,
+                    ),
+                    cells: _projectToRow(projects[i])
+                        .map(
+                          (cell) => DataCell(
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                maxWidth: 200,
+                                minWidth: 48,
+                              ),
+                              child: Text(
+                                cell,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 2,
                               ),
                             ),
-                          )
-                          .toList(),
-                      onSelectChanged: (_) => _showRowDetailBottomSheet(
-                        context,
-                        theme,
-                        project,
-                      ),
+                          ),
+                        )
+                        .toList(),
+                    onSelectChanged: (_) => _showRowDetailBottomSheet(
+                      context,
+                      theme,
+                      projects[i],
                     ),
-                  )
-                  .toList(),
+                  ),
+              ],
             ),
           ),
         ),
@@ -164,7 +168,7 @@ class _TableDataView extends ConsumerWidget {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.4),
+                    color: theme.colorScheme.outline.withOpacity(0.4),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -230,7 +234,7 @@ class _DetailRow extends StatelessWidget {
           Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
             ),
           ),
           const SizedBox(height: 4),

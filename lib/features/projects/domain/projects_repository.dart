@@ -7,6 +7,20 @@ class ProjectsRepository {
 
   final AppDatabase _db;
 
+  /// Mengembalikan project dengan [id], atau null jika tidak ada (untuk validasi current project).
+  Future<Project?> getProjectById(int id) async {
+    final row = await (_db.select(_db.projects)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    if (row == null) return null;
+    return Project(
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      locale: row.locale,
+      createdAt: row.createdAt,
+    );
+  }
+
   Future<int> createProject({
     required String name,
     String? description,

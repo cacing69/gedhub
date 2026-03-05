@@ -165,6 +165,7 @@ class HomePage extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
   ) async {
+    final scaffoldContext = context;
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
@@ -172,96 +173,206 @@ class HomePage extends ConsumerWidget {
 
     final repo = ref.read(projectsRepositoryProvider);
 
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Create New GEDCOM'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Project name',
-                      hintText: 'Contoh: Keluarga Besar XYZ',
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Create New GEDCOM'),
+            content: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      key: const Key('create_project_name'),
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Project name',
+                        hintText: 'Contoh: Keluarga Besar XYZ',
+                      ),
+                      maxLength: 200,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Nama project wajib diisi';
+                        }
+                        if (value.trim().length < 3) {
+                          return 'Minimal 3 karakter';
+                        }
+                        if (value.trim().length > 200) {
+                          return 'Maksimal 200 karakter';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Nama project wajib diisi';
-                      }
-                      if (value.trim().length < 3) {
-                        return 'Minimal 3 karakter';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: descriptionController,
-                    decoration: const InputDecoration(
-                      labelText: 'Description (optional)',
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: descriptionController,
+                      decoration: const InputDecoration(
+                        labelText: 'Description (optional)',
+                      ),
+                      maxLines: 2,
+                      maxLength: 500,
+                      validator: (value) {
+                        if (value != null &&
+                            value.trim().isNotEmpty &&
+                            value.trim().length > 500) {
+                          return 'Maksimal 500 karakter';
+                        }
+                        return null;
+                      },
                     ),
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: localeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Locale (optional)',
-                      hintText: 'Misalnya: id_ID',
-                    ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    _LocaleSelector(controller: localeController),
+                  ],
+                ),
               ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  if (!(formKey.currentState?.validate() ?? false)) {
+                    return;
+                  }
+
+                  final name = nameController.text.trim();
+                  final description = descriptionController.text.trim();
+                  final locale = localeController.text.trim();
+
+                  try {
+                    final newId = await repo.createProject(
+                      name: name,
+                      description:
+                          description.isEmpty ? null : description,
+                      locale: locale.isEmpty ? null : locale,
+                    );
+                    if (!context.mounted) return;
+                    Navigator.of(dialogContext).pop();
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      ref.read(currentProjectIdProvider.notifier).select(newId);
+                      if (scaffoldContext.mounted) {
+                        ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Project GEDCOM baru berhasil dibuat.'),
+                          ),
+                        );
+                      }
+                    });
+                  } catch (error) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text('Gagal membuat project: $error')),
+                    );
+                  }
+                },
+                child: const Text('Create'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      nameController.dispose();
+      descriptionController.dispose();
+      localeController.dispose();
+    }
+  }
+}
+
+/// Dropdown preset locale + opsi "Lainnya" dengan text field.
+class _LocaleSelector extends StatefulWidget {
+  const _LocaleSelector({required this.controller});
+
+  final TextEditingController controller;
+
+  static const List<String> _presets = ['id_ID', 'en_US', 'en_GB'];
+  static const String _other = 'Lainnya';
+
+  @override
+  State<_LocaleSelector> createState() => _LocaleSelectorState();
+}
+
+class _LocaleSelectorState extends State<_LocaleSelector> {
+  String? _selectedPreset;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedPreset = _LocaleSelector._presets.contains(widget.controller.text)
+        ? widget.controller.text
+        : null;
+    widget.controller.addListener(_onControllerChanged);
+  }
+
+  void _onControllerChanged() {
+    if (!mounted) return;
+    if (_LocaleSelector._presets.contains(widget.controller.text)) {
+      setState(() => _selectedPreset = widget.controller.text);
+    } else {
+      setState(() => _selectedPreset = null);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final value = _selectedPreset ?? _LocaleSelector._other;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        DropdownButtonFormField<String>(
+          value: value,
+          decoration: const InputDecoration(
+            labelText: 'Locale (optional)',
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                if (!(formKey.currentState?.validate() ?? false)) {
-                  return;
-                }
-
-                final name = nameController.text.trim();
-                final description = descriptionController.text.trim();
-                final locale = localeController.text.trim();
-
-                try {
-                  await repo.createProject(
-                    name: name,
-                    description: description.isEmpty ? null : description,
-                    locale: locale.isEmpty ? null : locale,
-                  );
-                  // ignore: use_build_context_synchronously
-                  Navigator.of(dialogContext).pop();
-                  // ignore: use_build_context_synchronously
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Project GEDCOM baru berhasil dibuat.'),
-                    ),
-                  );
-                } catch (error) {
-                  // ignore: use_build_context_synchronously
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Gagal membuat project: $error')),
-                  );
-                }
-              },
-              child: const Text('Create'),
+          items: [
+            ..._LocaleSelector._presets
+                .map(
+                  (p) => DropdownMenuItem(
+                    value: p,
+                    child: Text(p),
+                  ),
+                )
+                .toList(),
+            const DropdownMenuItem(
+              value: _LocaleSelector._other,
+              child: Text(_LocaleSelector._other),
             ),
           ],
-        );
-      },
+          onChanged: (v) {
+            setState(() {
+              _selectedPreset =
+                  v == _LocaleSelector._other ? null : v;
+              if (_selectedPreset != null) {
+                widget.controller.text = _selectedPreset!;
+              }
+            });
+          },
+        ),
+        if (_selectedPreset == null) ...[
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: widget.controller,
+            decoration: const InputDecoration(
+              labelText: 'Locale custom',
+              hintText: 'Misalnya: id_ID',
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

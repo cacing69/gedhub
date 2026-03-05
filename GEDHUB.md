@@ -91,6 +91,7 @@ Library yang \"direncanakan\" akan diadopsi secara bertahap sesuai kebutuhan fit
     - Deskripsi singkat project.
     - Locale/tanggal default (mis. format tanggal, zona waktu).
   - Menyiapkan struktur internal (database lokal) sehingga pengguna dapat langsung menambah orang, keluarga, dan event.
+- **Implementasi saat ini**: Setelah create berhasil project baru otomatis dipilih; ID project di SharedPreferences divalidasi lewat `getProjectById`; controller form didispose setelah dialog; state/SnackBar dijadwalkan dengan `addPostFrameCallback`; widget test untuk tab dan dialog, tes alur create di-skip karena build-scope di test env.
 
 ---
 
@@ -139,7 +140,7 @@ Untuk menjaga kompatibilitas data ketika struktur database berkembang, GEDHUB ak
     - Membuat seluruh tabel awal ketika instalasi pertama.
     - Menjalankan skrip migrasi ketika pengguna update ke versi aplikasi baru.
   - Source of truth skema:
-    - Berkas DDL di direktori `supports/` (`projects.ddl.sql`, `persons.ddl.sql`, `families.ddl.sql`, `events.ddl.sql`, `places.ddl.sql`, `sources.ddl.sql`) digunakan sebagai referensi desain skema.
+    - Berkas DDL di direktori `supports/data/` (`projects.ddl.sql`, `persons.ddl.sql`, `families.ddl.sql`, `events.ddl.sql`, `places.ddl.sql`, `sources.ddl.sql`, `contacts.ddl.sql`) digunakan sebagai referensi desain skema.
     - Implementasi aktual migrasi akan disinkronkan dengan DDL tersebut.
 
 - **Prinsip migrasi**
@@ -189,6 +190,13 @@ Deskripsi singkat (bukan skema teknis final):
 - **`Source` & `Citation`** (future enhancement)
   - Menyimpan sumber data (buku, dokumen, arsip, URL offline, dll) dan kaitannya dengan `Person`/`Event`.
   - Mapping GEDCOM: `SOUR`, `PAGE`, `QUAY`, dsb.
+
+- **`Contact`** (kontak per person, multi-provider)
+  - Satu person dapat punya banyak kontak (telepon, email, alamat, URL); setiap baris punya **provider** (sumber data).
+  - **Provider**: `contact_picker` (kontak dari perangkat), `manual` (input pengguna), `gedcom` (dari import), dll.
+  - **Target dasar**: Contact Picker (memilih kontak dari perangkat untuk dikaitkan ke person).
+  - Atribut konseptual: `personId`, `provider`, `contactType` (phone, email, address, url, other), `value`, `label` (opsional, mis. Mobile/Home/Work), `providerContactId` (untuk dedup/sync).
+  - DDL: `supports/data/contacts.ddl.sql`.
 
 Struktur ini dirancang agar:
 
@@ -396,7 +404,81 @@ Pengembangan kode GEDHUB mengikuti prinsip berikut agar basis kode tetap konsist
 - **Buat komponen/fungsi shareable** ketika pola yang sama muncul di dua atau lebih tempat: letakkan di `lib/core/` atau modul shared yang sesuai (mis. widget di `lib/core/widgets/` atau per feature jika hanya dipakai di satu feature).
 - **Gunakan tema dan `InputDecorationTheme`** untuk styling; hindari hardcode warna, radius, atau padding yang sudah didefinisikan di tema.
 
-Dengan menerapkan DRY, standar kode, dan pemanfaatan komponen/fungsi shareable, kode tetap rapi, mudah diuji, dan siap untuk penambahan fitur baru.
+### Unit Test Wajib per Fitur
+
+- **Setiap fitur harus memiliki unit test.** Tidak ada fitur baru yang dianggap selesai tanpa test yang mengcover logika inti (domain, repository, atau alur utama UI).
+- **Lokasi test**: mengikuti struktur `lib/` — mis. `lib/features/projects/` → `test/features/projects/` untuk unit test repository/domain; widget test bisa di `test/` root atau `test/features/<feature>/` (mis. `home_page_test.dart`).
+- **Cakupan minimal per fitur**:
+  - **Domain/Repository**: test CRUD, validasi, dan query (dengan database in-memory atau mock).
+  - **Provider (jika ada logika non-trivial)**: test state dan side-effect (override dependency bila perlu).
+  - **UI (widget test)**: test tampilan utama, tombol/aksi yang mengubah state, dan feedback (snackbar, dialog) bila memungkinkan tanpa ketergantungan berat ke platform.
+- **Alat**: `flutter test`; untuk test yang pakai Drift, gunakan `AppDatabase(DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true))` atau override `appDatabaseProvider` agar tidak ada timer/stream tertinggal.
+
+Dengan menerapkan DRY, standar kode, pemanfaatan komponen shareable, dan **unit test wajib per fitur**, kode tetap rapi, mudah diuji, dan siap untuk penambahan fitur baru.
+
+---
+
+## Rencana Unit Test
+
+Rencana ini memetakan fitur ke jenis test dan file test yang harus ada. Setiap fitur baru wajib menyertakan test sesuai tabel di bawah.
+
+### Prinsip
+
+| Prinsip | Keterangan |
+|--------|------------|
+| **Satu fitur = satu set test** | Setiap fitur di `lib/features/<nama>/` memiliki padanan test di `test/` (unit dan/atau widget). |
+| **Unit test dulu** | Repository, domain, dan helper diuji dengan unit test (tanpa UI). Database pakai in-memory. |
+| **Widget test untuk alur kritis** | Halaman/ dialog utama diuji dengan widget test; bila ada masalah build-scope atau platform, test bisa di-skip dengan alasan terdokumentasi. |
+| **Mock/override dependency** | SharedPreferences, database, dan provider di-override di test agar deterministik dan tidak bergantung ke lingkungan. |
+
+### Struktur Folder Test
+
+```
+test/
+├── features/
+│   ├── projects/
+│   │   └── projects_repository_test.dart   # unit: createProject, getProjectById, watchProjects
+│   ├── home/
+│   │   └── home_page_test.dart             # widget: welcome/Projects, dialog Create, alur create
+│   ├── peoples/
+│   │   └── ...                             # unit + widget saat fitur Peoples ada
+│   ├── tree/
+│   │   └── ...                             # unit + widget saat fitur Tree ada
+│   ├── settings/
+│   │   └── ...                             # widget bila ada logika UI
+│   └── devtools/
+│       └── ...                             # widget/unit bila diperlukan
+├── core/
+│   ├── database/
+│   │   └── app_database_test.dart          # optional: skema, migrasi
+│   └── app_providers_test.dart             # optional: provider behaviour
+└── widget_test.dart                        # smoke: main shell 4 tab saja
+```
+
+Setiap fitur punya file test mandiri (mis. `create_project` → unit di `projects_repository_test.dart`, UI create di `home_page_test.dart`). Jangan menumpuk semua test di satu `widget_test.dart`.
+
+### Pemetaan Fitur → Test
+
+| Fitur | Unit test | Widget test | Keterangan |
+|-------|-----------|-------------|------------|
+| **Projects (Create GEDCOM)** | `test/features/projects/projects_repository_test.dart`: createProject, getProjectById, watchProjects dengan DB in-memory | `test/features/home/home_page_test.dart`: welcome/Projects, dialog Create, alur create (satu di-skip) | Unit test mandiri; widget test mandiri per halaman. `widget_test.dart` hanya smoke (4 tab). |
+| **Import GEDCOM** | Parser/validator GEDCOM (saat ada); repository import | Halaman/ dialog import | Ditambah saat fitur diimplementasi. |
+| **Export GEDCOM** | Generator/export service (saat ada) | Tombol export, feedback | Ditambah saat fitur diimplementasi. |
+| **Peoples** | Repository/domain Person, CRUD | Daftar, form, filter | Ditambah saat fitur diimplementasi. |
+| **Tree** | Logic layout/navigasi pohon (bila ada di domain) | Tampilan tree, klik node | Ditambah saat fitur diimplementasi. |
+| **Settings** | — | Halaman settings bila ada logika | Opsional. |
+| **Dev Tools** | — | Akses long-press, daftar tools, inspector | Opsional; bisa manual. |
+| **Core (DB, providers)** | `app_database_test.dart` (skema/migrasi); `app_providers_test.dart` (currentProjectId, persist) | — | Prioritas setelah fitur per feature stabil. |
+
+### Checklist per Fitur Baru
+
+Saat menambah fitur baru:
+
+1. **Buat atau perluas** file test di `test/features/<nama_fitur>/`.
+2. **Unit test**: repository/domain (create, read, update, delete, query) dengan in-memory DB atau mock.
+3. **Widget test**: minimal satu test untuk tampilan/aksi utama (bila layar/dialog baru).
+4. **Jalankan** `flutter test` dan pastikan semua test lulus sebelum merge/PR.
+5. **Dokumentasi**: jika suatu test di-skip (mis. karena build-scope di test env), tulis alasan di `skip:` dan tetap uji manual.
 
 ---
 

@@ -19,7 +19,8 @@ class Projects extends Table {
 
 @DriftDatabase(tables: [Projects])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(openConnection());
+  AppDatabase([QueryExecutor? connection])
+      : super(connection ?? openConnection());
 
   @override
   int get schemaVersion => 1;
