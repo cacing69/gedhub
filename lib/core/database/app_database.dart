@@ -1,8 +1,9 @@
 import 'package:drift/drift.dart';
-import 'package:gedhub_app/core/database/connection/connection.dart';
+import 'package:gedhub/core/database/connection/connection.dart';
 
 part 'app_database.g.dart';
 
+@DataClassName('ProjectRow')
 class Projects extends Table {
   IntColumn get id => integer().autoIncrement()();
 
@@ -23,4 +24,3 @@ class AppDatabase extends _$AppDatabase {
   @override
   int get schemaVersion => 1;
 }
-

@@ -17,17 +17,41 @@ Target platform awal dijelaskan secara netral (web/desktop offline), namun desai
 
 ---
 
-## Stack & Library Flutter (Rencana)
+## Stack & Library Flutter
 
-Untuk implementasi aplikasi Flutter (`gedhub_app`), beberapa library akan digunakan ketika dibutuhkan untuk menjaga arsitektur tetap bersih, testable, dan ekspresif:
+Untuk implementasi aplikasi Flutter (`gedhub`), beberapa library digunakan (dan sebagian lagi direncanakan) untuk menjaga arsitektur tetap bersih, testable, dan ekspresif:
 
-- **Dio + Retrofit**: untuk HTTP client dan deklarasi API berbasis interface (digunakan nanti saat ada kebutuhan sinkronisasi/backup online atau layanan eksternal).
-- **Freezed**: untuk data class/union type yang immutable dan memiliki `copyWith`, equality, dan codegen yang kuat (model domain, DTO, state).
-- **GoRouter**: untuk manajemen routing dan navigasi yang deklaratif, terutama ketika aplikasi bertumbuh menjadi multi‑screen yang kompleks.
-- **Riverpod**: sebagai state management utama (dependency injection + reactive state) menggantikan pengelolaan state manual atau `Provider` dasar.
-- **Dartz**: untuk tipe fungsional seperti `Either`, `Option`, dsb. yang membantu memodelkan hasil operasi (sukses/gagal) secara eksplisit di domain layer.
+- **Riverpod (flutter_riverpod)** – **SUDAH digunakan** sebagai state management & dependency injection utama:
+  - `ProviderScope` membungkus `GedhubApp`.
+  - Provider inti:
+    - `appDatabaseProvider` – menyediakan instance `AppDatabase`.
+    - `projectsRepositoryProvider` – menyediakan akses ke repository project.
+    - `projectsStreamProvider` – menyediakan stream daftar project GEDCOM.
+    - `currentProjectIdProvider` – menyimpan ID project GEDCOM yang saat ini aktif (untuk switching multi‑project).
+  - Provider disusun menggunakan **pola anotasi `@riverpod`** dari paket `riverpod_annotation`:
+    - Contoh pola definisi:
 
-Library‑library ini akan diadopsi secara bertahap sesuai kebutuhan fitur (tidak semuanya harus diaktifkan sekaligus di awal).
+      ```dart
+      @riverpod
+      ProjectsRepository projectsRepository(ProjectsRepositoryRef ref) {
+        final db = ref.watch(appDatabaseProvider);
+        return ProjectsRepository(db);
+      }
+      ```
+
+    - Codegen (`riverpod_generator` + `build_runner`) akan menghasilkan file `app_providers.g.dart` yang mendefinisikan provider dengan nama `projectsRepositoryProvider`, `projectsStreamProvider`, dst.
+    - Dengan pola ini, penamaan provider konsisten dan siap dikembangkan (auto‑disposal, refactor aman, dsb.).
+- **Drift** – digunakan untuk persistence lokal berbasis SQLite/IndexedDB (via `AppDatabase` dan tabel `Projects`, dengan skema selaras DDL di direktori `supports/`):
+  - Menggunakan anotasi Drift:
+    - `@DataClassName('ProjectRow')` pada `Projects` untuk mengontrol nama data class yang di‑generate.
+    - `@DriftDatabase(tables: [Projects])` pada `AppDatabase` untuk mendefinisikan database utama.
+  - File `app_database.dart` menyertakan `part 'app_database.g.dart';` dan membutuhkan codegen (`drift_dev` + `build_runner`) untuk menghasilkan implementasi (`_$AppDatabase`, accessor `projects`, helper seperti `into`/`select`, dsb.).
+- **Dio + Retrofit** – direncanakan untuk HTTP client dan deklarasi API berbasis interface (mis. sinkronisasi/backup online di masa depan).
+- **Freezed** – direncanakan untuk data class/union type immutable dengan `copyWith`, equality, dan codegen (model domain, DTO, state).
+- **GoRouter** – direncanakan untuk manajemen routing dan navigasi deklaratif ketika aplikasi bertumbuh menjadi multi‑screen yang lebih kompleks.
+- **Dartz** – direncanakan untuk tipe fungsional seperti `Either`, `Option`, dsb., agar hasil operasi (sukses/gagal) dapat dimodelkan eksplisit di domain layer.
+
+Library yang \"direncanakan\" akan diadopsi secara bertahap sesuai kebutuhan fitur (tidak semuanya harus diaktifkan sekaligus di awal).
 
 ---
 
@@ -102,6 +126,33 @@ Untuk implementasi awal pada platform web/desktop berbasis teknologi web (mis. R
   - Kebutuhan query relasional yang lebih kompleks (JOIN multi‑tabel, agregasi berat).
   - Migrasi dari IndexedDB dapat direncanakan dengan pemetaan skema yang jelas (`Person`, `Family`, `Event`, `Source`, dll).
 
+### Versioning & Migrasi Database (Drift)
+
+Untuk menjaga kompatibilitas data ketika struktur database berkembang, GEDHUB akan menggunakan mekanisme **versioning dan migrasi** yang disediakan oleh Drift:
+
+- **Schema versioning**
+  - `AppDatabase.schemaVersion` menyimpan versi skema saat ini (dimulai dari `1`).
+  - Setiap perubahan struktural (tambah kolom/tabel, ubah index) akan menaikkan versi skema (`2`, `3`, dst.) dan didokumentasikan.
+
+- **Migrasi terkontrol**
+  - Drift menyediakan hook `MigrationStrategy` dengan `onCreate` dan `onUpgrade` untuk:
+    - Membuat seluruh tabel awal ketika instalasi pertama.
+    - Menjalankan skrip migrasi ketika pengguna update ke versi aplikasi baru.
+  - Source of truth skema:
+    - Berkas DDL di direktori `supports/` (`projects.ddl.sql`, `persons.ddl.sql`, `families.ddl.sql`, `events.ddl.sql`, `places.ddl.sql`, `sources.ddl.sql`) digunakan sebagai referensi desain skema.
+    - Implementasi aktual migrasi akan disinkronkan dengan DDL tersebut.
+
+- **Prinsip migrasi**
+  - **Backward compatible** sejauh mungkin:
+    - Menambah kolom/tabel baru dengan default yang aman.
+    - Menghindari perubahan destruktif tanpa migrasi eksplisit (drop kolom/tabel tanpa transform data).
+  - **Teruji**:
+    - Setiap migrasi skema penting akan diiringi test yang mem-verifikasi bahwa:
+      - Data lama tetap terbaca dengan benar.
+      - Fitur baru bekerja di atas skema yang telah dimigrasikan.
+
+Pendekatan ini memastikan bahwa pengguna dapat terus memperbarui GEDHUB tanpa kehilangan data, meskipun struktur internal database berkembang untuk mendukung fitur-fitur baru.
+
 ### Sketsa Entitas Utama (Konseptual)
 
 Deskripsi singkat (bukan skema teknis final):
@@ -168,7 +219,7 @@ flowchart TD
 
   ui --> gedcomModule[GedcomModule]
   gedcomModule --> storage[LocalStorageLayer]
-  storage --> indexedDb[IndexedDB/Dexie]
+  storage --> db[Drift: SQLite/IndexedDB]
 ```
 
 ---
@@ -193,7 +244,10 @@ Aplikasi memiliki 4 menu/tab utama:
     - Satu kartu untuk masing‑masing aksi utama (Create, Import, Export).
     - Icon sederhana + judul + deskripsi singkat pada tiap kartu.
   - Tombol aksi besar dan jelas, mudah diakses (accessible).
-  - (Future) Seksi “Recent projects” yang menampilkan project terakhir dibuka.
+  - Seksi **Projects** di bawah kartu utama:
+    - Menampilkan daftar project GEDCOM yang tersimpan.
+    - Menggunakan Riverpod (`projectsStreamProvider`) untuk memuat list project secara reaktif.
+    - Pengguna dapat memilih **project aktif** (via `currentProjectIdProvider`) sehingga fitur lain (Peoples, Tree) nantinya dapat bekerja per‑project.
 
 ### 2. Peoples
 
@@ -241,7 +295,49 @@ Aplikasi memiliki 4 menu/tab utama:
 
 ---
 
+## Dev Tools & Drift Inspector
+
+Untuk membantu proses pengembangan dan debugging, GEDHUB menyediakan halaman **Dev Tools** yang bersifat internal (tidak ditujukan untuk end‑user non‑teknis).
+
+- **Cara akses Dev Tools**
+  - Dari aplikasi utama, **long-press (tahan) di mana saja** pada layar.
+  - Setelah long-press, aplikasi menampilkan halaman penuh `DevtoolsPage` (Dev Tools).
+
+- **Struktur teknis**
+  - Implementasi global gesture:
+    - `GedhubApp` membungkus seluruh konten `MaterialApp` dengan `DevtoolsGestureOverlay` melalui properti `builder`.
+    - `DevtoolsGestureOverlay` menggunakan `GestureDetector.onLongPress` untuk membuka Dev Tools (navigasi via `navigatorKey`).
+  - Halaman Dev Tools:
+    - `lib/features/devtools/presentation/devtools_page.dart` berisi `DevtoolsPage` (berbasis `ConsumerWidget`).
+    - Menggunakan provider Riverpod (mis. `projectsStreamProvider`, `currentProjectIdProvider`) untuk membaca data dari Drift.
+
+- **Drift Inspector (versi awal)**
+  - Menampilkan ringkasan data dari database lokal:
+    - Saat ini fokus pada tabel `projects` (daftar semua project GEDCOM yang tersimpan).
+    - Menampilkan:
+      - Jumlah project.
+      - Detail tiap project (id, nama, locale, waktu pembuatan).
+      - Indikator project aktif (selaras dengan `currentProjectIdProvider`).
+  - Dirancang agar mudah diperluas:
+    - Di masa depan dapat menambah panel untuk tabel lain (`persons`, `families`, `events`, dsb.) dan utilitas debug lain (mis. export snapshot DB, konsistensi relasi).
+
+
+---
+
 ## Konsep UI & UX
+
+### Implementasi Tema (shadcn-style)
+
+- Tema aplikasi didefinisikan di **`lib/core/theme/app_theme.dart`**.
+- **Palet**: netral ala shadcn (slate/zinc) — background `#FAFAFA`, foreground `#0A0A0A`, border `#E5E5E5`, primary gelap.
+- **Komponen**:
+  - **Card**: elevation 0, border 1px, radius 12px.
+  - **Input**: filled, border halus, radius 8px, focus ring.
+  - **Button**: FilledButton/TextButton dengan padding dan radius konsisten.
+  - **ListTile**: shape rounded, padding seragam.
+  - **AppBar / NavigationBar**: elevation 0, warna netral.
+  - **Dialog / SnackBar**: rounded, border halus, floating snackbar.
+- Halaman Home memakai `Card` dan `_SectionCard` (container dengan border & radius) agar daftar project tampil konsisten dengan gaya ini.
 
 ### Pendekatan Desain
 
@@ -275,6 +371,55 @@ Aplikasi memiliki 4 menu/tab utama:
   - Kontras warna yang baik.
   - Navigasi keyboard.
   - Struktur heading dan landmark yang semantik (untuk screen reader) direncanakan sejak awal.
+
+---
+
+## Prinsip Pengembangan Kode
+
+Pengembangan kode GEDHUB mengikuti prinsip berikut agar basis kode tetap konsisten, mudah dirawat, dan dapat dikembangkan jangka panjang.
+
+### Don't Repeat Yourself (DRY)
+
+- **Hindari duplikasi**: logika, tampilan, atau data yang sama tidak ditulis berulang di banyak tempat.
+- **Ekstraksi ke unit yang dapat dipakai ulang**: jika suatu blok kode dipakai di lebih dari satu lokasi, pindahkan ke fungsi, extension, atau komponen bersama.
+- **Satu sumber kebenaran**: untuk aturan bisnis, konstanta, atau konfigurasi, definisikan di satu tempat dan rujuk dari sana.
+
+### Standar Kode
+
+- **Selalu menulis kode sesuai standar** yang berlaku di project (termasuk style guide Dart/Flutter, konvensi penamaan, dan aturan dari `analysis_options.yaml` / linter).
+- **Konsisten** dalam pola yang dipilih (mis. struktur folder feature-based, penggunaan Riverpod/Drift, pola repository).
+- **Dokumentasi singkat** untuk API publik, use case non-trivial, dan keputusan arsitektur yang penting.
+
+### Komponen & Fungsi yang Dapat Dipakai Ulang (Shareable)
+
+- **Manfaatkan komponen dan fungsi yang sudah ada** sebelum menulis implementasi baru: cek tema di `lib/core/theme/`, widget UI yang dipakai di feature lain, provider di `app_providers`, repository, dan helper di `core/`.
+- **Buat komponen/fungsi shareable** ketika pola yang sama muncul di dua atau lebih tempat: letakkan di `lib/core/` atau modul shared yang sesuai (mis. widget di `lib/core/widgets/` atau per feature jika hanya dipakai di satu feature).
+- **Gunakan tema dan `InputDecorationTheme`** untuk styling; hindari hardcode warna, radius, atau padding yang sudah didefinisikan di tema.
+
+Dengan menerapkan DRY, standar kode, dan pemanfaatan komponen/fungsi shareable, kode tetap rapi, mudah diuji, dan siap untuk penambahan fitur baru.
+
+---
+
+## Status Implementasi vs Spesifikasi
+
+Dokumen ini mencatat kesesuaian implementasi saat ini dengan persyaratan di atas. Diperbarui seiring perkembangan.
+
+| Aspek | Spesifikasi | Status saat ini |
+|-------|-------------|-----------------|
+| **Fitur GEDCOM – Create** | Buat project baru (nama, deskripsi, locale) | ✅ Terpenuhi |
+| **Fitur GEDCOM – Import** | Import file .ged, validasi, ringkasan | ❌ Belum (placeholder) |
+| **Fitur GEDCOM – Export** | Ekspor basis data aktif ke .ged | ❌ Belum (placeholder) |
+| **Tab Home** | Create, Import, Export + daftar project & pilih project aktif | ✅ Create + list project + switch project |
+| **Tab Peoples** | Daftar individu, search/filter, tambah/edit/hapus | ❌ Placeholder (belum ada tabel Person) |
+| **Tab Tree** | Visual pohon keluarga, zoom/pan, node klik | ❌ Placeholder |
+| **Tab Settings** | Placeholder untuk pengaturan | ✅ Sesuai (placeholder) |
+| **Model data – Project** | Tabel project di storage | ✅ Drift tabel `projects` |
+| **Model data – Person/Family/Event** | Entitas utama untuk silsilah | ❌ Belum (hanya DDL di `supports/`, belum tabel Drift) |
+| **Offline-first** | Semua data utama lokal | ⚠️ Sebagian (baru project; orang/keluarga/event belum) |
+| **UI shadcn-style** | Tema, Card, Input, border, radius | ✅ Tema + komponen konsisten |
+| **Dev Tools** | Akses long-press, Drift Inspector, Shared Prefs | ✅ Terpenuhi (long-press, list tools, inspector tabel + row detail) |
+
+**Ringkasan gap:** Import/Export GEDCOM belum diimplementasikan; Peoples dan Tree masih placeholder karena model Person/Family/Event belum ada di database; storage baru dipakai untuk project, belum untuk data silsilah penuh.
 
 ---
 

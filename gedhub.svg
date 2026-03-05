@@ -1,0 +1,22 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">GEDHUB Logo</title>
+  <desc id="desc">Clean minimalist logo for the GEDHUB genealogy application.</desc>
+
+  <!-- Background (full canvas) -->
+  <rect x="0" y="0" width="256" height="256" fill="#020617" />
+
+  <!-- Tree / graph symbol (larger & centered) -->
+  <g transform="translate(13 20) scale(1.8)" stroke-linecap="round">
+    <!-- Edges -->
+    <path d="M64 30 L32 82" stroke="#1f2937" stroke-width="4" />
+    <path d="M64 30 L96 82" stroke="#1f2937" stroke-width="4" />
+    <path d="M64 36 L64 90" stroke="#1f2937" stroke-width="4" />
+
+    <!-- Nodes -->
+    <circle cx="64" cy="28" r="13" fill="#0f172a" stroke="#4f46e5" stroke-width="3" />
+    <circle cx="32" cy="84" r="10" fill="#020617" stroke="#4b5563" stroke-width="3" />
+    <circle cx="64" cy="92" r="10" fill="#020617" stroke="#4b5563" stroke-width="3" />
+    <circle cx="96" cy="84" r="10" fill="#020617" stroke="#4b5563" stroke-width="3" />
+  </g>
+</svg>
+

@@ -1,44 +1,41 @@
 import 'package:flutter/material.dart';
-import 'package:gedhub_app/features/projects/domain/projects_repository.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gedhub/core/app_providers.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    return Padding(
+    final projectsAsync = ref.watch(projectsStreamProvider);
+    final currentProjectId = ref.watch(currentProjectIdProvider);
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Welcome to GEDHUB',
-            style: theme.textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 8),
+          Text('Welcome to GEDHUB', style: theme.textTheme.titleLarge),
+          const SizedBox(height: 4),
           Text(
             'Mulai project silsilah baru atau kelola data GEDCOM Anda secara offline.',
-            style: theme.textTheme.bodyMedium,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
           Wrap(
-            spacing: 16,
-            runSpacing: 16,
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              _ActionCard(
+              _ActionChip(
                 icon: Icons.add_circle_outline,
-                title: 'Create New GEDCOM',
-                description:
-                    'Buat project/pohon keluarga baru dari nol dengan nama dan deskripsi.',
-                onTap: () => _showCreateProjectDialog(context),
+                label: 'Create',
+                onTap: () => _showCreateProjectDialog(context, ref),
               ),
-              _ActionCard(
+              _ActionChip(
                 icon: Icons.file_open_outlined,
-                title: 'Import GEDCOM',
-                description:
-                    'Impor file .ged yang sudah ada (placeholder – coming soon).',
+                label: 'Import',
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -47,11 +44,9 @@ class HomePage extends StatelessWidget {
                   );
                 },
               ),
-              _ActionCard(
+              _ActionChip(
                 icon: Icons.upload_file_outlined,
-                title: 'Export GEDCOM',
-                description:
-                    'Ekspor project aktif ke file .ged (placeholder – coming soon).',
+                label: 'Export',
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -62,18 +57,120 @@ class HomePage extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          Text('Projects', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          projectsAsync.when(
+            data: (projects) {
+              if (projects.isEmpty) {
+                return _SectionCard(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 8,
+                    ),
+                    child: Text(
+                      'Belum ada project. Mulai dengan "Create New GEDCOM".',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return _SectionCard(
+                child: Column(
+                  children: projects
+                      .map(
+                        (project) => ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          leading: Icon(
+                            currentProjectId == project.id
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            size: 20,
+                            color: currentProjectId == project.id
+                                ? theme.colorScheme.primary
+                                : null,
+                          ),
+                          title: Text(project.name),
+                          subtitle:
+                              project.description != null &&
+                                  project.description!.isNotEmpty
+                              ? Text(
+                                  project.description!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.6),
+                                  ),
+                                )
+                              : null,
+                          onTap: () {
+                            ref
+                                .read(currentProjectIdProvider.notifier)
+                                .select(project.id);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Project aktif: ${project.name}'),
+                              ),
+                            );
+                          },
+                        ),
+                      )
+                      .toList(),
+                ),
+              );
+            },
+            loading: () => const _SectionCard(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                child: SizedBox(
+                  height: 24,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            error: (error, _) => _SectionCard(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'Gagal memuat daftar project: $error',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Future<void> _showCreateProjectDialog(BuildContext context) async {
+  Future<void> _showCreateProjectDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
     final localeController = TextEditingController(text: 'id_ID');
 
-    final repo = context.read<ProjectsRepository>();
+    final repo = ref.read(projectsRepositoryProvider);
 
     await showDialog<void>(
       context: context,
@@ -156,9 +253,7 @@ class HomePage extends StatelessWidget {
                 } catch (error) {
                   // ignore: use_build_context_synchronously
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Gagal membuat project: $error'),
-                    ),
+                    SnackBar(content: Text('Gagal membuat project: $error')),
                   );
                 }
               },
@@ -171,47 +266,42 @@ class HomePage extends StatelessWidget {
   }
 }
 
-class _ActionCard extends StatelessWidget {
-  const _ActionCard({
+/// Tombol aksi ringkas (icon + label) untuk menghemat ruang vertikal.
+class _ActionChip extends StatelessWidget {
+  const _ActionChip({
     required this.icon,
-    required this.title,
-    required this.description,
+    required this.label,
     required this.onTap,
   });
 
   final IconData icon;
-  final String title;
-  final String description;
+  final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SizedBox(
-      width: 260,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 28, color: theme.colorScheme.primary),
-                const SizedBox(height: 12),
-                Text(
-                  title,
-                  style: theme.textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  description,
-                  style: theme.textTheme.bodyMedium,
-                ),
-              ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.5),
             ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(label, style: theme.textTheme.labelMedium),
+            ],
           ),
         ),
       ),
@@ -219,4 +309,26 @@ class _ActionCard extends StatelessWidget {
   }
 }
 
+/// Container section dengan border & radius konsisten (shadcn-style).
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.child});
 
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.5),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: child,
+    );
+  }
+}

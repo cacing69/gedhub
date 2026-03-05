@@ -1,4 +1,4 @@
-# gedhub_app
+# gedhub
 
 A new Flutter project.
 

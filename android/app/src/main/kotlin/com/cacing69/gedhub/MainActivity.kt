@@ -1,4 +1,4 @@
-package com.example.gedhub_app
+package com.cacing69.gedhub
 
 import io.flutter.embedding.android.FlutterActivity
 

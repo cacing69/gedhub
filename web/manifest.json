@@ -1,6 +1,6 @@
 {
-    "name": "gedhub_app",
-    "short_name": "gedhub_app",
+    "name": "GedHub",
+    "short_name": "GedHub",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

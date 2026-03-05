@@ -7,7 +7,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:gedhub_app/main.dart';
+import 'package:gedhub/main.dart';
 
 void main() {
   testWidgets('Main shell renders 4 tabs', (WidgetTester tester) async {
