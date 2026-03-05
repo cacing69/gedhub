@@ -81,5 +81,58 @@ void main() {
       expect(list.first.createdAt.isAfter(list.last.createdAt) ||
           list.first.createdAt.isAtSameMomentAs(list.last.createdAt), isTrue);
     });
+
+    test('updateProject changes name and getProjectById returns updated data',
+        () async {
+      final id = await repo.createProject(
+        name: 'Original',
+        description: 'Desc',
+        locale: 'en_US',
+      );
+      final updated = await repo.updateProject(
+        id,
+        name: 'Updated Name',
+        description: 'New desc',
+        locale: 'id_ID',
+      );
+      expect(updated, isTrue);
+
+      final project = await repo.getProjectById(id);
+      expect(project, isNotNull);
+      expect(project!.name, 'Updated Name');
+      expect(project.description, 'New desc');
+      expect(project.locale, 'id_ID');
+    });
+
+    test('updateProject returns false for non-existent id', () async {
+      final updated = await repo.updateProject(
+        99999,
+        name: 'No such project',
+      );
+      expect(updated, isFalse);
+    });
+
+    test('deleteProject removes project and getProjectById returns null',
+        () async {
+      final id = await repo.createProject(name: 'To Delete');
+      final deleted = await repo.deleteProject(id);
+      expect(deleted, isTrue);
+
+      final project = await repo.getProjectById(id);
+      expect(project, isNull);
+    });
+
+    test('deleteProject returns false for non-existent id', () async {
+      final deleted = await repo.deleteProject(99999);
+      expect(deleted, isFalse);
+    });
+
+    test('watchProjects no longer includes project after delete', () async {
+      final id = await repo.createProject(name: 'Will Delete');
+      await repo.deleteProject(id);
+
+      final list = await repo.watchProjects().first;
+      expect(list.where((p) => p.id == id), isEmpty);
+    });
   });
 }

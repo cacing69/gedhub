@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gedhub/core/app_providers.dart';
 import 'package:gedhub/core/database/app_database.dart';
+import 'package:gedhub/features/projects/domain/project.dart';
 import 'package:gedhub/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -64,5 +65,74 @@ void main() {
 
       expect(find.text('Create New GEDCOM'), findsNothing);
     }, skip: true); // Build scope issue in test env; flow works manually
+
+    testWidgets('project list shows Edit/Delete menu when project exists',
+        (WidgetTester tester) async {
+      final project = Project(
+        id: 1,
+        name: 'Test Project',
+        description: null,
+        locale: null,
+        createdAt: DateTime(2025, 1, 1),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appDatabaseProvider.overrideWith(
+              (ref) => AppDatabase(
+                DatabaseConnection(
+                  NativeDatabase.memory(),
+                  closeStreamsSynchronously: true,
+                ),
+              ),
+            ),
+            projectsStreamProvider.overrideWith(
+              (ref) => Stream.value([project]),
+            ),
+          ],
+          child: const GedhubApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Test Project'), findsOneWidget);
+      expect(find.byIcon(Icons.more_vert), findsOneWidget);
+    });
+
+    testWidgets('opening project menu shows Edit and Delete',
+        (WidgetTester tester) async {
+      final project = Project(
+        id: 1,
+        name: 'Menu Test',
+        description: null,
+        locale: null,
+        createdAt: DateTime(2025, 1, 1),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appDatabaseProvider.overrideWith(
+              (ref) => AppDatabase(
+                DatabaseConnection(
+                  NativeDatabase.memory(),
+                  closeStreamsSynchronously: true,
+                ),
+              ),
+            ),
+            projectsStreamProvider.overrideWith(
+              (ref) => Stream.value([project]),
+            ),
+          ],
+          child: const GedhubApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.more_vert));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit'), findsOneWidget);
+      expect(find.text('Delete'), findsOneWidget);
+    });
   });
 }

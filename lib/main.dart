@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedhub/core/app_providers.dart';
 import 'package:gedhub/core/theme/app_theme.dart';
@@ -68,15 +69,8 @@ class DevtoolsGestureOverlay extends StatelessWidget {
   }
 }
 
-class _MainShell extends StatefulWidget {
+class _MainShell extends HookWidget {
   const _MainShell();
-
-  @override
-  State<_MainShell> createState() => _MainShellState();
-}
-
-class _MainShellState extends State<_MainShell> {
-  int _currentIndex = 0;
 
   static const _pages = <Widget>[
     HomePage(),
@@ -94,17 +88,16 @@ class _MainShellState extends State<_MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = useState(0);
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titles[_currentIndex]),
+        title: Text(_titles[currentIndex.value]),
       ),
-      body: _pages[_currentIndex],
+      body: _pages[currentIndex.value],
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
+        selectedIndex: currentIndex.value,
         onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          currentIndex.value = index;
         },
         destinations: const [
           NavigationDestination(

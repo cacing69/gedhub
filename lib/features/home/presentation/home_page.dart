@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:gedhub/core/app_providers.dart';
+import 'package:gedhub/features/projects/domain/project.dart';
 
-class HomePage extends ConsumerWidget {
+class HomePage extends HookConsumerWidget {
   const HomePage({super.key});
 
   @override
@@ -112,6 +114,40 @@ class HomePage extends ConsumerWidget {
                                   ),
                                 )
                               : null,
+                          trailing: PopupMenuButton<String>(
+                            icon: const Icon(Icons.more_vert),
+                            onSelected: (value) {
+                              if (value == 'edit') {
+                                _showEditProjectDialog(context, ref, project);
+                              } else if (value == 'delete') {
+                                _showDeleteProjectDialog(context, ref, project);
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.edit_outlined, size: 20),
+                                    SizedBox(width: 8),
+                                    Text('Edit'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.delete_outline, size: 20),
+                                    SizedBox(width: 8),
+                                    Text('Delete'),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                           onTap: () {
                             ref
                                 .read(currentProjectIdProvider.notifier)
@@ -166,128 +202,345 @@ class HomePage extends ConsumerWidget {
     WidgetRef ref,
   ) async {
     final scaffoldContext = context;
-    final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
-    final localeController = TextEditingController(text: 'id_ID');
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Create New GEDCOM'),
+        content: _CreateProjectFormContent(
+          dialogContext: dialogContext,
+          onSuccess: (newId) {
+            ref.read(currentProjectIdProvider.notifier).select(newId);
+            if (scaffoldContext.mounted) {
+              ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                const SnackBar(
+                  content: Text('Project GEDCOM baru berhasil dibuat.'),
+                ),
+              );
+            }
+          },
+          onCancel: () => Navigator.of(dialogContext).pop(),
+        ),
+      ),
+    );
+  }
 
+  Future<void> _showEditProjectDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Project project,
+  ) async {
+    final scaffoldContext = context;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit Project'),
+        content: _EditProjectFormContent(
+          project: project,
+          dialogContext: dialogContext,
+          onSaved: () {
+            if (scaffoldContext.mounted) {
+              ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                const SnackBar(content: Text('Project berhasil diperbarui.')),
+              );
+            }
+          },
+          onCancel: () => Navigator.of(dialogContext).pop(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showDeleteProjectDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Project project,
+  ) async {
+    final scaffoldContext = context;
     final repo = ref.read(projectsRepositoryProvider);
+    final currentId = ref.read(currentProjectIdProvider);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete project?'),
+        content: Text(
+          'Project "${project.name}" akan dihapus. Tindakan ini tidak dapat dibatalkan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
 
     try {
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) {
-          return AlertDialog(
-            title: const Text('Create New GEDCOM'),
-            content: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      key: const Key('create_project_name'),
-                      controller: nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Project name',
-                        hintText: 'Contoh: Keluarga Besar XYZ',
-                      ),
-                      maxLength: 200,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Nama project wajib diisi';
-                        }
-                        if (value.trim().length < 3) {
-                          return 'Minimal 3 karakter';
-                        }
-                        if (value.trim().length > 200) {
-                          return 'Maksimal 200 karakter';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: descriptionController,
-                      decoration: const InputDecoration(
-                        labelText: 'Description (optional)',
-                      ),
-                      maxLines: 2,
-                      maxLength: 500,
-                      validator: (value) {
-                        if (value != null &&
-                            value.trim().isNotEmpty &&
-                            value.trim().length > 500) {
-                          return 'Maksimal 500 karakter';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _LocaleSelector(controller: localeController),
-                  ],
-                ),
-              ),
+      final deleted = await repo.deleteProject(project.id);
+      if (currentId == project.id) {
+        ref.read(currentProjectIdProvider.notifier).select(null);
+      }
+      if (scaffoldContext.mounted) {
+        ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+          SnackBar(
+            content: Text(
+              deleted ? 'Project "${project.name}" telah dihapus.' : 'Gagal menghapus project.',
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () async {
-                  if (!(formKey.currentState?.validate() ?? false)) {
-                    return;
-                  }
-
-                  final name = nameController.text.trim();
-                  final description = descriptionController.text.trim();
-                  final locale = localeController.text.trim();
-
-                  try {
-                    final newId = await repo.createProject(
-                      name: name,
-                      description:
-                          description.isEmpty ? null : description,
-                      locale: locale.isEmpty ? null : locale,
-                    );
-                    if (!context.mounted) return;
-                    Navigator.of(dialogContext).pop();
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      ref.read(currentProjectIdProvider.notifier).select(newId);
-                      if (scaffoldContext.mounted) {
-                        ScaffoldMessenger.of(scaffoldContext).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                'Project GEDCOM baru berhasil dibuat.'),
-                          ),
-                        );
-                      }
-                    });
-                  } catch (error) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content: Text('Gagal membuat project: $error')),
-                    );
-                  }
-                },
-                child: const Text('Create'),
-              ),
-            ],
-          );
-        },
-      );
-    } finally {
-      nameController.dispose();
-      descriptionController.dispose();
-      localeController.dispose();
+          ),
+        );
+      }
+    } catch (error) {
+      if (scaffoldContext.mounted) {
+        ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+          SnackBar(content: Text('Gagal menghapus project: $error')),
+        );
+      }
     }
   }
 }
 
-/// Dropdown preset locale + opsi "Lainnya" dengan text field.
-class _LocaleSelector extends StatefulWidget {
+/// Form create project dengan controller dari hooks (auto-dispose saat dialog ditutup).
+class _CreateProjectFormContent extends HookConsumerWidget {
+  const _CreateProjectFormContent({
+    required this.dialogContext,
+    required this.onSuccess,
+    required this.onCancel,
+  });
+
+  final BuildContext dialogContext;
+  final void Function(int newId) onSuccess;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final formKey = useMemoized(GlobalKey<FormState>.new);
+    final nameController = useTextEditingController();
+    final descriptionController = useTextEditingController();
+    final localeController = useTextEditingController(text: 'id_ID');
+    final repo = ref.read(projectsRepositoryProvider);
+
+    return Form(
+      key: formKey,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              key: const Key('create_project_name'),
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Project name',
+                hintText: 'Contoh: Keluarga Besar XYZ',
+              ),
+              maxLength: 200,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Nama project wajib diisi';
+                }
+                if (value.trim().length < 3) {
+                  return 'Minimal 3 karakter';
+                }
+                if (value.trim().length > 200) {
+                  return 'Maksimal 200 karakter';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Description (optional)',
+              ),
+              maxLines: 2,
+              maxLength: 500,
+              validator: (value) {
+                if (value != null &&
+                    value.trim().isNotEmpty &&
+                    value.trim().length > 500) {
+                  return 'Maksimal 500 karakter';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            _LocaleSelector(controller: localeController),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: onCancel,
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () async {
+                    if (!(formKey.currentState?.validate() ?? false)) return;
+                    final name = nameController.text.trim();
+                    final description = descriptionController.text.trim();
+                    final locale = localeController.text.trim();
+                    try {
+                      final newId = await repo.createProject(
+                        name: name,
+                        description:
+                            description.isEmpty ? null : description,
+                        locale: locale.isEmpty ? null : locale,
+                      );
+                      if (!context.mounted) return;
+                      Navigator.of(dialogContext).pop();
+                      onSuccess(newId);
+                    } catch (error) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Gagal membuat project: $error'),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Create'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Form edit project dengan controller dari hooks (auto-dispose saat dialog ditutup).
+class _EditProjectFormContent extends HookConsumerWidget {
+  const _EditProjectFormContent({
+    required this.project,
+    required this.dialogContext,
+    required this.onSaved,
+    required this.onCancel,
+  });
+
+  final Project project;
+  final BuildContext dialogContext;
+  final VoidCallback onSaved;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final formKey = useMemoized(GlobalKey<FormState>.new);
+    final nameController = useTextEditingController(text: project.name);
+    final descriptionController = useTextEditingController(
+      text: project.description ?? '',
+    );
+    final localeController = useTextEditingController(
+      text: project.locale ?? 'id_ID',
+    );
+    final repo = ref.read(projectsRepositoryProvider);
+
+    return Form(
+      key: formKey,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              key: const Key('edit_project_name'),
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Project name',
+                hintText: 'Contoh: Keluarga Besar XYZ',
+              ),
+              maxLength: 200,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Nama project wajib diisi';
+                }
+                if (value.trim().length < 3) {
+                  return 'Minimal 3 karakter';
+                }
+                if (value.trim().length > 200) {
+                  return 'Maksimal 200 karakter';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Description (optional)',
+              ),
+              maxLines: 2,
+              maxLength: 500,
+              validator: (value) {
+                if (value != null &&
+                    value.trim().isNotEmpty &&
+                    value.trim().length > 500) {
+                  return 'Maksimal 500 karakter';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            _LocaleSelector(controller: localeController),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: onCancel,
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () async {
+                    if (!(formKey.currentState?.validate() ?? false)) return;
+                    final name = nameController.text.trim();
+                    final description = descriptionController.text.trim();
+                    final locale = localeController.text.trim();
+                    try {
+                      final updated = await repo.updateProject(
+                        project.id,
+                        name: name,
+                        description:
+                            description.isEmpty ? null : description,
+                        locale: locale.isEmpty ? null : locale,
+                      );
+                      if (!context.mounted) return;
+                      Navigator.of(dialogContext).pop();
+                      if (updated) onSaved();
+                    } catch (error) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Gagal memperbarui project: $error'),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Dropdown preset locale + opsi "Lainnya" dengan text field. Menggunakan hooks.
+class _LocaleSelector extends HookWidget {
   const _LocaleSelector({required this.controller});
 
   final TextEditingController controller;
@@ -296,39 +549,20 @@ class _LocaleSelector extends StatefulWidget {
   static const String _other = 'Lainnya';
 
   @override
-  State<_LocaleSelector> createState() => _LocaleSelectorState();
-}
-
-class _LocaleSelectorState extends State<_LocaleSelector> {
-  String? _selectedPreset;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedPreset = _LocaleSelector._presets.contains(widget.controller.text)
-        ? widget.controller.text
-        : null;
-    widget.controller.addListener(_onControllerChanged);
-  }
-
-  void _onControllerChanged() {
-    if (!mounted) return;
-    if (_LocaleSelector._presets.contains(widget.controller.text)) {
-      setState(() => _selectedPreset = widget.controller.text);
-    } else {
-      setState(() => _selectedPreset = null);
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_onControllerChanged);
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final value = _selectedPreset ?? _LocaleSelector._other;
+    final selectedPreset = useState<String?>(
+      _presets.contains(controller.text) ? controller.text : null,
+    );
+    useEffect(() {
+      void listener() {
+        selectedPreset.value =
+            _presets.contains(controller.text) ? controller.text : null;
+      }
+      controller.addListener(listener);
+      return () => controller.removeListener(listener);
+    }, [controller]);
+
+    final value = selectedPreset.value ?? _other;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -339,33 +573,28 @@ class _LocaleSelectorState extends State<_LocaleSelector> {
             labelText: 'Locale (optional)',
           ),
           items: [
-            ..._LocaleSelector._presets
-                .map(
-                  (p) => DropdownMenuItem(
-                    value: p,
-                    child: Text(p),
-                  ),
-                )
-                .toList(),
+            ..._presets.map(
+              (p) => DropdownMenuItem(
+                value: p,
+                child: Text(p),
+              ),
+            ),
             const DropdownMenuItem(
-              value: _LocaleSelector._other,
-              child: Text(_LocaleSelector._other),
+              value: _other,
+              child: Text(_other),
             ),
           ],
           onChanged: (v) {
-            setState(() {
-              _selectedPreset =
-                  v == _LocaleSelector._other ? null : v;
-              if (_selectedPreset != null) {
-                widget.controller.text = _selectedPreset!;
-              }
-            });
+            selectedPreset.value = v == _other ? null : v;
+            if (selectedPreset.value != null) {
+              controller.text = selectedPreset.value!;
+            }
           },
         ),
-        if (_selectedPreset == null) ...[
+        if (selectedPreset.value == null) ...[
           const SizedBox(height: 12),
           TextFormField(
-            controller: widget.controller,
+            controller: controller,
             decoration: const InputDecoration(
               labelText: 'Locale custom',
               hintText: 'Misalnya: id_ID',

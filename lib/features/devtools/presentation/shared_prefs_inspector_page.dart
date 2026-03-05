@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:gedhub/core/app_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Menampilkan key-value SharedPreferences yang tersimpan (nama key + nilai).
-class SharedPrefsInspectorPage extends ConsumerWidget {
+class SharedPrefsInspectorPage extends HookConsumerWidget {
   const SharedPrefsInspectorPage({super.key});
 
   @override

@@ -41,6 +41,10 @@ Untuk implementasi aplikasi Flutter (`gedhub`), beberapa library digunakan (dan 
 
     - Codegen (`riverpod_generator` + `build_runner`) akan menghasilkan file `app_providers.g.dart` yang mendefinisikan provider dengan nama `projectsRepositoryProvider`, `projectsStreamProvider`, dst.
     - Dengan pola ini, penamaan provider konsisten dan siap dikembangkan (auto‑disposal, refactor aman, dsb.).
+- **flutter_hooks & hooks_riverpod** – **SUDAH digunakan** untuk menggabungkan hooks dengan Riverpod:
+  - `HookWidget` dipakai di `_MainShell` (tab index) dan `_LocaleSelector` (state preset locale).
+  - `HookConsumerWidget` dipakai di `HomePage`, `_CreateProjectFormContent`, `_EditProjectFormContent`, `SettingsPage`, `DriftTableDataPage`, `SharedPrefsInspectorPage`.
+  - `useState`, `useEffect`, `useTextEditingController`, `useMemoized` dipakai untuk state lokal dan lifecycle (controller form di dialog auto-dispose saat dialog ditutup).
 - **Drift** – digunakan untuk persistence lokal berbasis SQLite/IndexedDB (via `AppDatabase` dan tabel `Projects`, dengan skema selaras DDL di direktori `supports/`):
   - Menggunakan anotasi Drift:
     - `@DataClassName('ProjectRow')` pada `Projects` untuk mengontrol nama data class yang di‑generate.
@@ -91,7 +95,11 @@ Library yang \"direncanakan\" akan diadopsi secara bertahap sesuai kebutuhan fit
     - Deskripsi singkat project.
     - Locale/tanggal default (mis. format tanggal, zona waktu).
   - Menyiapkan struktur internal (database lokal) sehingga pengguna dapat langsung menambah orang, keluarga, dan event.
-- **Implementasi saat ini**: Setelah create berhasil project baru otomatis dipilih; ID project di SharedPreferences divalidasi lewat `getProjectById`; controller form didispose setelah dialog; state/SnackBar dijadwalkan dengan `addPostFrameCallback`; widget test untuk tab dan dialog, tes alur create di-skip karena build-scope di test env.
+- **Implementasi saat ini**:
+  - **Create**: Setelah create berhasil project baru otomatis dipilih; ID project di SharedPreferences divalidasi lewat `getProjectById`; controller form didispose setelah dialog; state/SnackBar dijadwalkan dengan `addPostFrameCallback`.
+  - **Edit**: Tiap project di list punya menu (ikon ⋮) → Edit; dialog form sama seperti Create dengan field terisi; simpan memanggil `updateProject(id, ...)`; SnackBar konfirmasi.
+  - **Delete**: Menu → Delete; dialog konfirmasi; panggil `deleteProject(id)`; bila project yang dihapus adalah current project, `currentProjectId` di-reset; SnackBar konfirmasi.
+  - Unit test: create, getProjectById, watchProjects, **updateProject**, **deleteProject** di `projects_repository_test.dart`. Widget test untuk tab dan dialog Create (alur create di-skip karena build-scope di test env).
 
 ---
 
@@ -437,7 +445,7 @@ Rencana ini memetakan fitur ke jenis test dan file test yang harus ada. Setiap f
 test/
 ├── features/
 │   ├── projects/
-│   │   └── projects_repository_test.dart   # unit: createProject, getProjectById, watchProjects
+│   │   └── projects_repository_test.dart   # unit: create, getProjectById, watchProjects, updateProject, deleteProject
 │   ├── home/
 │   │   └── home_page_test.dart             # widget: welcome/Projects, dialog Create, alur create
 │   ├── peoples/
@@ -461,7 +469,7 @@ Setiap fitur punya file test mandiri (mis. `create_project` → unit di `project
 
 | Fitur | Unit test | Widget test | Keterangan |
 |-------|-----------|-------------|------------|
-| **Projects (Create GEDCOM)** | `test/features/projects/projects_repository_test.dart`: createProject, getProjectById, watchProjects dengan DB in-memory | `test/features/home/home_page_test.dart`: welcome/Projects, dialog Create, alur create (satu di-skip) | Unit test mandiri; widget test mandiri per halaman. `widget_test.dart` hanya smoke (4 tab). |
+| **Projects (CRUD)** | `test/features/projects/projects_repository_test.dart`: createProject, getProjectById, watchProjects, **updateProject**, **deleteProject** dengan DB in-memory | `test/features/home/home_page_test.dart`: welcome/Projects, dialog Create (alur create di-skip) | Create, Edit, Delete project; unit test lengkap untuk repository. |
 | **Import GEDCOM** | Parser/validator GEDCOM (saat ada); repository import | Halaman/ dialog import | Ditambah saat fitur diimplementasi. |
 | **Export GEDCOM** | Generator/export service (saat ada) | Tombol export, feedback | Ditambah saat fitur diimplementasi. |
 | **Peoples** | Repository/domain Person, CRUD | Daftar, form, filter | Ditambah saat fitur diimplementasi. |
@@ -488,7 +496,7 @@ Dokumen ini mencatat kesesuaian implementasi saat ini dengan persyaratan di atas
 
 | Aspek | Spesifikasi | Status saat ini |
 |-------|-------------|-----------------|
-| **Fitur GEDCOM – Create** | Buat project baru (nama, deskripsi, locale) | ✅ Terpenuhi |
+| **Fitur GEDCOM – Create / Edit / Delete** | CRUD project: buat, edit (dialog), hapus (konfirmasi) | ✅ Terpenuhi |
 | **Fitur GEDCOM – Import** | Import file .ged, validasi, ringkasan | ❌ Belum (placeholder) |
 | **Fitur GEDCOM – Export** | Ekspor basis data aktif ke .ged | ❌ Belum (placeholder) |
 | **Tab Home** | Create, Import, Export + daftar project & pilih project aktif | ✅ Create + list project + switch project |

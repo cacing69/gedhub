@@ -35,6 +35,30 @@ class ProjectsRepository {
         );
   }
 
+  /// Mengubah project dengan [id]. Mengembalikan true jika ada baris yang di-update.
+  Future<bool> updateProject(
+    int id, {
+    required String name,
+    String? description,
+    String? locale,
+  }) async {
+    final updated = await (_db.update(_db.projects)..where((t) => t.id.equals(id)))
+        .write(
+      ProjectsCompanion(
+        name: Value(name),
+        description: Value(description),
+        locale: Value(locale),
+      ),
+    );
+    return updated > 0;
+  }
+
+  /// Menghapus project dengan [id]. Mengembalikan true jika ada baris yang dihapus.
+  Future<bool> deleteProject(int id) async {
+    final deleted = await (_db.delete(_db.projects)..where((t) => t.id.equals(id))).go();
+    return deleted > 0;
+  }
+
   Stream<List<Project>> watchProjects() {
     final query = _db.select(_db.projects)
       ..orderBy([

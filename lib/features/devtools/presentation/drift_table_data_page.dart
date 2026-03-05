@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:gedhub/core/app_providers.dart';
 import 'package:gedhub/features/projects/domain/project.dart';
 
 /// Tampilan data tabel ala database explorer: header kolom + baris data compact.
-class DriftTableDataPage extends ConsumerWidget {
+class DriftTableDataPage extends HookConsumerWidget {
   const DriftTableDataPage({super.key, required this.tableName});
 
   final String tableName;
@@ -20,7 +20,7 @@ class DriftTableDataPage extends ConsumerWidget {
   }
 }
 
-class _TableDataView extends ConsumerWidget {
+class _TableDataView extends HookConsumerWidget {
   const _TableDataView({required this.tableName});
 
   final String tableName;
@@ -80,9 +80,11 @@ class _TableDataView extends ConsumerWidget {
       fontWeight: FontWeight.w600,
       fontSize: 12,
     );
-    final headerColor = theme.colorScheme.primaryContainer.withOpacity(0.4);
-    final oddRowColor = theme.colorScheme.surfaceContainerHighest.withOpacity(0.5);
+    final headerColor = theme.colorScheme.primaryContainer.withOpacity(0.45);
     final evenRowColor = theme.colorScheme.surface;
+    final oddRowColor = theme.colorScheme.primaryContainer.withOpacity(
+      theme.brightness == Brightness.dark ? 0.2 : 0.1,
+    );
 
     return Scrollbar(
       child: SingleChildScrollView(
