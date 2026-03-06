@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:gedhub/features/devtools/presentation/drift_inspector_page.dart';
-import 'package:gedhub/features/devtools/presentation/shared_prefs_inspector_page.dart';
+import 'package:gedhub/core/router/app_router.dart';
+import 'package:go_router/go_router.dart';
 
 class DevtoolsPage extends StatelessWidget {
   const DevtoolsPage({super.key});
@@ -11,14 +11,14 @@ class DevtoolsPage extends StatelessWidget {
       title: 'Drift Inspector',
       subtitle: 'Inspect tabel & data database Drift (SQLite)',
       icon: Icons.storage_outlined,
-      page: DriftInspectorPage(),
+      path: AppRoutes.devtoolsDrift,
     ),
     _ToolItem(
       id: 'shared_prefs',
       title: 'Shared Prefs',
       subtitle: 'Lihat key-value yang tersimpan di SharedPreferences',
       icon: Icons.key_outlined,
-      page: SharedPrefsInspectorPage(),
+      path: AppRoutes.devtoolsSharedPrefs,
     ),
   ];
 
@@ -47,13 +47,7 @@ class DevtoolsPage extends StatelessWidget {
               title: Text(tool.title),
               subtitle: Text(tool.subtitle),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => tool.page,
-                  ),
-                );
-              },
+              onTap: () => context.push(tool.path),
             ),
           ),
           const SizedBox(height: 24),
@@ -78,11 +72,11 @@ class _ToolItem {
     required this.title,
     required this.subtitle,
     required this.icon,
-    required this.page,
+    required this.path,
   });
   final String id;
   final String title;
   final String subtitle;
   final IconData icon;
-  final Widget page;
+  final String path;
 }

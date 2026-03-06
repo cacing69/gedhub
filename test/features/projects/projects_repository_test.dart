@@ -3,6 +3,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gedhub/core/database/app_database.dart';
 import 'package:gedhub/features/projects/domain/projects_repository.dart';
+import 'package:gedhub/features/projects/data/projects_repository_impl.dart';
 
 void main() {
   late AppDatabase db;
@@ -15,7 +16,7 @@ void main() {
         closeStreamsSynchronously: true,
       ),
     );
-    repo = ProjectsRepository(db);
+    repo = ProjectsRepositoryImpl(db);
   });
 
   tearDown(() async {
@@ -25,14 +26,18 @@ void main() {
   group('ProjectsRepository', () {
     test('createProject returns new id and getProjectById returns project',
         () async {
-      final id = await repo.createProject(
+      final createResult = await repo.createProject(
         name: 'Keluarga XYZ',
         description: 'Deskripsi singkat',
         locale: 'id_ID',
       );
+      expect(createResult.isRight(), true);
+      final id = createResult.getOrElse(() => 0);
       expect(id, greaterThan(0));
 
-      final project = await repo.getProjectById(id);
+      final getResult = await repo.getProjectById(id);
+      expect(getResult.isRight(), true);
+      final project = getResult.getOrElse(() => null);
       expect(project, isNotNull);
       expect(project!.id, id);
       expect(project.name, 'Keluarga XYZ');
@@ -42,17 +47,23 @@ void main() {
     });
 
     test('createProject with only required name', () async {
-      final id = await repo.createProject(name: 'Minimal');
+      final createResult = await repo.createProject(name: 'Minimal');
+      expect(createResult.isRight(), true);
+      final id = createResult.getOrElse(() => 0);
       expect(id, greaterThan(0));
 
-      final project = await repo.getProjectById(id);
+      final getResult = await repo.getProjectById(id);
+      expect(getResult.isRight(), true);
+      final project = getResult.getOrElse(() => null);
       expect(project!.name, 'Minimal');
       expect(project.description, isNull);
       expect(project.locale, isNull);
     });
 
     test('getProjectById returns null for non-existent id', () async {
-      final project = await repo.getProjectById(99999);
+      final getResult = await repo.getProjectById(99999);
+      expect(getResult.isRight(), true);
+      final project = getResult.getOrElse(() => null);
       expect(project, isNull);
     });
 
@@ -61,7 +72,9 @@ void main() {
       final list = await stream.first;
       expect(list, isEmpty);
 
-      final id = await repo.createProject(name: 'First');
+      final createResult = await repo.createProject(name: 'First');
+      expect(createResult.isRight(), true);
+      final id = createResult.getOrElse(() => 0);
       final list2 = await stream.first;
       expect(list2.length, 1);
       expect(list2.first.id, id);
@@ -69,9 +82,11 @@ void main() {
     });
 
     test('watchProjects returns all projects ordered by createdAt desc', () async {
-      await repo.createProject(name: 'Older');
+      final r1 = await repo.createProject(name: 'Older');
+      expect(r1.isRight(), true);
       await Future.delayed(const Duration(milliseconds: 50));
-      await repo.createProject(name: 'Newer');
+      final r2 = await repo.createProject(name: 'Newer');
+      expect(r2.isRight(), true);
 
       final list = await repo.watchProjects().first;
       expect(list.length, 2);
@@ -84,20 +99,26 @@ void main() {
 
     test('updateProject changes name and getProjectById returns updated data',
         () async {
-      final id = await repo.createProject(
+      final createResult = await repo.createProject(
         name: 'Original',
         description: 'Desc',
         locale: 'en_US',
       );
-      final updated = await repo.updateProject(
+      expect(createResult.isRight(), true);
+      final id = createResult.getOrElse(() => 0);
+
+      final updateResult = await repo.updateProject(
         id,
         name: 'Updated Name',
         description: 'New desc',
         locale: 'id_ID',
       );
-      expect(updated, isTrue);
+      expect(updateResult.isRight(), true);
+      expect(updateResult.getOrElse(() => false), isTrue);
 
-      final project = await repo.getProjectById(id);
+      final getResult = await repo.getProjectById(id);
+      expect(getResult.isRight(), true);
+      final project = getResult.getOrElse(() => null);
       expect(project, isNotNull);
       expect(project!.name, 'Updated Name');
       expect(project.description, 'New desc');
@@ -105,31 +126,43 @@ void main() {
     });
 
     test('updateProject returns false for non-existent id', () async {
-      final updated = await repo.updateProject(
+      final updateResult = await repo.updateProject(
         99999,
         name: 'No such project',
       );
-      expect(updated, isFalse);
+      expect(updateResult.isRight(), true);
+      expect(updateResult.getOrElse(() => true), isFalse);
     });
 
     test('deleteProject removes project and getProjectById returns null',
         () async {
-      final id = await repo.createProject(name: 'To Delete');
-      final deleted = await repo.deleteProject(id);
-      expect(deleted, isTrue);
+      final createResult = await repo.createProject(name: 'To Delete');
+      expect(createResult.isRight(), true);
+      final id = createResult.getOrElse(() => 0);
 
-      final project = await repo.getProjectById(id);
+      final deleteResult = await repo.deleteProject(id);
+      expect(deleteResult.isRight(), true);
+      expect(deleteResult.getOrElse(() => false), isTrue);
+
+      final getResult = await repo.getProjectById(id);
+      expect(getResult.isRight(), true);
+      final project = getResult.getOrElse(() => null);
       expect(project, isNull);
     });
 
     test('deleteProject returns false for non-existent id', () async {
-      final deleted = await repo.deleteProject(99999);
-      expect(deleted, isFalse);
+      final deleteResult = await repo.deleteProject(99999);
+      expect(deleteResult.isRight(), true);
+      expect(deleteResult.getOrElse(() => true), isFalse);
     });
 
     test('watchProjects no longer includes project after delete', () async {
-      final id = await repo.createProject(name: 'Will Delete');
-      await repo.deleteProject(id);
+      final createResult = await repo.createProject(name: 'Will Delete');
+      expect(createResult.isRight(), true);
+      final id = createResult.getOrElse(() => 0);
+
+      final deleteResult = await repo.deleteProject(id);
+      expect(deleteResult.isRight(), true);
 
       final list = await repo.watchProjects().first;
       expect(list.where((p) => p.id == id), isEmpty);

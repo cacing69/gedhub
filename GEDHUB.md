@@ -17,6 +17,129 @@ Target platform awal dijelaskan secara netral (web/desktop offline), namun desai
 
 ---
 
+## AI-Driven Development
+
+Aplikasi GEDHUB ini **dibangun sepenuhnya dengan bantuan AI** (Artificial Intelligence). Seluruh proses pengembangan meliputi:
+
+- **Perencanaan arsitektur & fitur** – AI membantu merancang struktur aplikasi, memilih teknologi yang tepat, dan menentukan prioritas fitur.
+- **Implementasi kode** – AI menulis kode Dart/Flutter yang mengikuti best practice (clean architecture, DRY, unit tests, error handling).
+- **Refactoring & optimasi** – AI mengidentifikasi kode yang bisa di-improve dan melakukan refactor untuk menjaga kualitas.
+- **Dokumentasi** – AI memperbarui dan menjaga dokumentasi (GEDHUB.md) agar selalu sinkron dengan implementasi.
+- **Debugging & troubleshooting** – AI membantu memecahkan masalah, linter errors, dan edge cases.
+- **Continuity** – AI memastikan implementasi baru konsisten dengan pola dan konvensi yang sudah ada.
+- **Enhance when safe** – Saat memperbaiki atau menambah fitur, AI boleh (dan disarankan) memperkuat kode yang ada—mis. null-safety, tipe yang tepat, penghapusan duplikasi—selama tidak mengubah perilaku yang diharapkan dan tetap mengikuti panduan project.
+
+**Setiap AI agent yang mengerjakan kode GEDHUB wajib mengikuti [Panduan untuk AI Agent](#panduan-untuk-ai-agent) di bawah dan tidak mengubah function/kode yang sudah ada kecuali memang sangat diperlukan.**
+
+Pendekatan ini mempercepat pengembangan sambil menjaga konsistensi arsitektur, kode, dan dokumentasi.
+
+---
+
+## Panduan untuk AI Agent
+
+**Dokumen ini (GEDHUB.md) adalah acuan utama untuk setiap AI agent yang mengerjakan project GEDHUB.** Agent wajib mengikuti instruksi dan pola di bawah; jangan mengubah kode yang sudah ada kecuali memang sangat diperlukan.
+
+### Instruksi Wajib untuk Agent
+
+1. **Ikuti panduan ini**
+   - Setiap perubahan atau penambahan kode **harus** mengikuti pola, konvensi, dan struktur yang dideskripsikan di GEDHUB.md (termasuk bagian ini, Stack & Library, Prinsip Pengembangan Kode, dan Rencana Unit Test).
+   - Sebelum mengubah atau menambah file, baca bagian yang relevan di GEDHUB.md dan bandingkan dengan contoh yang sudah ada di codebase (mis. fitur Projects, Peoples).
+
+2. **Jangan mengubah sembarang function/kode yang sudah ada**
+   - **Jangan** refactor, rename, atau mengubah signature/implementasi function, class, atau file yang sudah berjalan **kecuali**:
+     - User secara eksplisit meminta perubahan tersebut, atau
+     - Diperlukan untuk **memperbaiki bug** yang dilaporkan, atau
+     - Diperlukan agar **fitur yang diminta** bisa berjalan (dan perubahan dibatasi sekecil mungkin), atau
+     - Diperlukan agar kode **memenuhi pola yang didokumentasikan di GEDHUB.md** (mis. konvensi Drift, Riverpod, repository).
+   - Jika ragu apakah suatu perubahan “sangat diperlukan”, prioritaskan **tidak mengubah** kode yang ada; cukup tambah kode baru atau beri saran di penjelasan.
+
+3. **Pola di atas segalanya**
+   - Konsistensi dengan pola yang sudah ada (folder, penamaan, signature, API Drift/Riverpod) lebih penting daripada “perbaikan” style yang tidak diminta. Jika ingin mengusulkan refactor besar, sampaikan dalam penjelasan dan jangan lakukan tanpa konfirmasi user.
+
+4. **Enhancement hanya bila aman**
+   - Memperkuat kode (null-safety, tipe, reuse) saat mengerjakan task yang diminta **boleh** dilakukan, asalkan tidak mengubah perilaku yang diharapkan dan tetap mengikuti pola di dokumen ini.
+
+### Konteks & Prinsip Umum
+
+- **Baca dulu, ubah belakangan**: sebelum mengubah atau menambah file, baca file terkait (repository, provider, halaman) dan contoh serupa di fitur lain (mis. Projects vs Peoples).
+- **Ikuti pola yang sudah ada**: struktur folder, penamaan, signature method, dan cara pakai Drift/Riverpod/UI harus mengikuti contoh yang sudah dipakai di project.
+- **Enhance when safe**: jika saat memperbaiki bug atau menambah fitur ada peluang untuk memperbaiki kode yang ada (mis. null-check, tipe yang lebih tepat, ekstraksi helper), lakukan selama tidak mengubah perilaku yang diharapkan dan tetap konsisten dengan style project.
+
+### Struktur Folder & File
+
+- **Feature-based**: `lib/features/<feature>/` dengan subfolder `domain/` (model, repository) dan `presentation/` (page, widget).
+- **Test mirror**: `test/features/<feature>/` mengikuti struktur `lib/`; satu fitur punya set test sendiri (repository test, page test).
+- **DDL referensi**: skema SQL di `supports/data/*.ddl.sql` (snake_case); implementasi Drift di Dart pakai camelCase dan selaras dengan DDL.
+
+### Konvensi Drift (Database)
+
+- **Kolom**: setiap getter kolom harus mengembalikan tipe kolom final, bukan `ColumnBuilder`. Akhiri chain dengan `()`:
+  - `IntColumn get id => integer().autoIncrement()();`
+  - `TextColumn get name => text()();`
+  - `RealColumn get latitude => real().nullable()();`
+- **Jangan pakai `int()`**: untuk kolom integer pakai `integer()`, bukan `int()`.
+- **Return type**: sesuaikan dengan tipe kolom (`IntColumn`, `TextColumn`, `RealColumn`, `DateTimeColumn`).
+- **Data class**: pakai `@DataClassName('XxxRow')` per tabel.
+- **Migration**: `onCreate` pakai `m.createAll()` (bukan `createAllTables()`); `onUpgrade` pakai instance tabel dari generated DB (lowercase), mis. `m.createTable(persons)`, bukan `m.createTable(Persons)`.
+- **Query chain**: saat memanggil `.where()` lalu `.write()` / `.getSingleOrNull()` / `.go()`, kelompokkan dengan kurung agar method dipanggil pada statement, bukan pada hasil `..where()` (yang void): `(_db.update(_db.persons)..where((p) => p.id.equals(id))).write(...)`.
+- **Companion insert**: kolom required pakai nilai langsung (mis. `String`); kolom nullable pakai `Value(x)`.
+- **Companion update**: semua field yang diubah pakai `Value(...)`; untuk “tidak diubah” pakai `Value.absent()`.
+- **OrderBy**: pakai `OrderingTerm.asc(tabel.kolom)` / `OrderingTerm.desc(...)`, bukan kolom mentah.
+
+### Repository & Domain
+
+- **Abstraksi repository (interface + impl + fake)**:
+  - Di **domain** definisikan **abstract interface** (mis. `abstract interface class PersonsRepository`) dengan method yang mengembalikan `Future<Either<RepositoryFailure, T>>` untuk operasi yang dapat gagal; stream tetap `Stream<List<T>>`.
+  - **Implementasi nyata** (Drift/SQLite) di folder **data** dengan nama `XxxRepositoryImpl` (mis. `lib/features/peoples/data/persons_repository_impl.dart`). Provider mengembalikan tipe interface tetapi meng-instantiate impl: `return PersonsRepositoryImpl(db)` sehingga di test bisa di-override dengan fake.
+  - **Fake** untuk test (in-memory, tanpa DB) implement interface yang sama (mis. `test/features/peoples/data/fake_persons_repository.dart`). Saat test, override provider dengan fake agar tidak butuh database.
+- **Constructor**: repository menerima `AppDatabase` (atau dependency lain lewat constructor), bukan baca dari global/provider di dalam method.
+- **Mapping**: repository mengembalikan model domain (mis. `Person`, `Project`), bukan row Drift; map row → model di dalam repository.
+- **CRUD signature**: update/delete pakai id sebagai argumen posisi pertama, mis. `updatePerson(int id, { ... })`, `deleteProject(int id)`; jangan pakai named parameter untuk id.
+- **Boolean di DB**: kolom integer 0/1 di Drift; di domain pakai `bool`. Saat baca: `row.isLiving != 0`; saat tulis: `Value(isLiving ? 1 : 0)`.
+- **Kegagalan**: pakai `RepositoryFailure` (Freezed) dan `Either<RepositoryFailure, T>` (Dartz); jangan throw di repository untuk error bisnis—kembalikan `left(RepositoryFailure.database(...))`.
+
+#### Abstraksi Repository (interface + impl + fake)
+
+Struktur per fitur:
+
+- **Domain**: `features/<feature>/domain/xxx_repository.dart` — hanya abstract interface (method returning `Either`/`Stream`).
+- **Data**: `features/<feature>/data/xxx_repository_impl.dart` — implementasi dengan Drift; wrap error ke `left(RepositoryFailure.database(...))`.
+- **Test**: `test/features/<feature>/data/fake_xxx_repository.dart` — implementasi in-memory untuk unit/widget test tanpa database.
+
+Di `app_providers.dart` provider mengembalikan tipe **interface** dan meng-instantiate **impl**: `return PersonsRepositoryImpl(db)`. Di test, override provider dengan `FakePersonsRepository()` agar tidak perlu `AppDatabase`.
+
+### Riverpod (Provider)
+
+- **Nama fungsi vs provider**: nama fungsi bebas (mis. `personsStream`); codegen menghasilkan provider dengan suffix `Provider` (mis. `personsStreamProvider`). Hindari nama fungsi yang sudah berakhiran `Provider` agar tidak jadi `personsStreamProviderProvider`.
+- **Stream/async yang tergantung project**: jika provider tergantung `currentProjectIdProvider` (bisa null), kembalikan stream/list kosong bila null, mis. `if (projectId == null) return Stream.value([]);`.
+- **Family provider**: provider dengan parameter (mis. `personId`) dipanggil sebagai `ref.watch(namaProviderProvider(id))` (nama generated-nya pakai suffix ganda untuk family).
+
+### UI & Presentation
+
+- **Routing**: navigasi ke halaman lain pakai **go_router**: `context.push(AppRoutes.xxx)` atau `context.push(path, extra: data)`. Kembali dengan `context.pop()` / `context.pop(result)`. Path didefinisikan di `AppRoutes` (`lib/core/router/app_router.dart`); jangan hardcode path string.
+- **State**: halaman dengan form + akses provider pakai `HookConsumerWidget`; state lokal pakai hooks (`useState`, `useTextEditingController`, `useMemoized`).
+- **Dialog**: di dalam dialog yang dibuka dengan `showDialog`, dapatkan theme dari context dialog: `Theme.of(dialogContext).colorScheme.error` (bukan `theme` dari scope luar). Tutup `content: Form(...)` dengan `),` sebelum `actions:` agar `actions` jadi parameter `AlertDialog`, bukan `Form`.
+- **Ref vs context**: di widget yang dapat `WidgetRef` (ConsumerWidget, HookConsumerWidget), pakai `ref.read(...)` / `ref.watch(...)` untuk provider; jangan pakai `context.read(...)`.
+- **Material widget**: jika membuat wrapper di sekitar widget Material (mis. FilterChip), beri nama lain (mis. `_FilterChipChoice`) agar tidak bentrok dengan kelas Material; gunakan parameter yang sesuai dengan API Flutter yang dipakai (mis. `selected` vs `isSelected` sesuai versi).
+- **Warna**: pakai `theme.colorScheme` / `Theme.of(context).colorScheme`; untuk warna khusus (mis. female) pakai `Colors.pink` jika `ColorScheme` tidak menyediakan.
+- **FilledButton.icon**: parameter `label` bertipe `Widget`, bukan `String`; pakai `label: const Text('...')`.
+- **Nullable ke Widget**: jika nilai bisa null (mis. hasil `_formatYear`), beri fallback sebelum dipakai di `Text`: `_formatYear(...) ?? '—'`.
+
+### Null-safety & Tipe
+
+- **AsyncValue.value**: bisa null (loading/error); sebelum memanggil `.where`/`.map` pada list, lakukan null check dan early return atau fallback.
+- **DropdownButtonFormField**: `value` harus salah satu nilai item atau null; `onChanged` menerima `String?` — beri default saat assign ke controller: `value ?? 'U'`.
+- **useTextEditingController(text: x)**: jika `x` nullable, pakai `text: x ?? ''` (atau default lain yang masuk akal).
+
+### Enhancement yang Dianjurkan
+
+- **Selesaikan error analyzer dulu**: perbaiki error, lalu warning, lalu info (deprecation, style) bila relevan.
+- **Kurangi duplikasi**: jika pola yang sama muncul di beberapa dialog/halaman, pertimbangkan ekstraksi widget atau helper.
+- **Perkuat validasi & edge case**: mis. dropdown `value` yang valid, null check pada stream/list, konversi int↔bool untuk kolom “living”.
+- **Jalankan codegen setelah ubah Drift/Riverpod**: `dart run build_runner build --delete-conflicting-outputs` setelah mengubah tabel atau definisi provider.
+
+---
+
 ## Stack & Library Flutter
 
 Untuk implementasi aplikasi Flutter (`gedhub`), beberapa library digunakan (dan sebagian lagi direncanakan) untuk menjaga arsitektur tetap bersih, testable, dan ekspresif:
@@ -35,7 +158,7 @@ Untuk implementasi aplikasi Flutter (`gedhub`), beberapa library digunakan (dan 
       @riverpod
       ProjectsRepository projectsRepository(ProjectsRepositoryRef ref) {
         final db = ref.watch(appDatabaseProvider);
-        return ProjectsRepository(db);
+        return ProjectsRepositoryImpl(db);  // interface type, impl instance
       }
       ```
 
@@ -50,12 +173,28 @@ Untuk implementasi aplikasi Flutter (`gedhub`), beberapa library digunakan (dan 
     - `@DataClassName('ProjectRow')` pada `Projects` untuk mengontrol nama data class yang di‑generate.
     - `@DriftDatabase(tables: [Projects])` pada `AppDatabase` untuk mendefinisikan database utama.
   - File `app_database.dart` menyertakan `part 'app_database.g.dart';` dan membutuhkan codegen (`drift_dev` + `build_runner`) untuk menghasilkan implementasi (`_$AppDatabase`, accessor `projects`, helper seperti `into`/`select`, dsb.).
+- **Dartz** – **SUDAH digunakan** untuk tipe `Either<L, R>` di return type repository. Semua method repository yang dapat gagal (getById, create, update, delete) mengembalikan `Future<Either<RepositoryFailure, T>>`; pemanggil memakai `.fold((f) => ... error ..., (t) => ... success ...)` untuk menangani gagal/sukses. Lihat [Abstraksi Repository](#abstraksi-repository-interface--impl--fake) di bawah.
+- **Freezed** – **SUDAH digunakan** untuk union type kegagalan: `RepositoryFailure` di `lib/core/domain/repository_failure.dart` (variant `.database(message)`, `.notFound(message)`). Codegen: `repository_failure.freezed.dart`.
+- **GoRouter** – **SUDAH digunakan** untuk routing dan navigasi deklaratif. Konfigurasi di `lib/core/router/app_router.dart`; path dan konstanta route di `AppRoutes`. Detail di [Routing (GoRouter)](#routing-gorouter) di bawah.
 - **Dio + Retrofit** – direncanakan untuk HTTP client dan deklarasi API berbasis interface (mis. sinkronisasi/backup online di masa depan).
-- **Freezed** – direncanakan untuk data class/union type immutable dengan `copyWith`, equality, dan codegen (model domain, DTO, state).
-- **GoRouter** – direncanakan untuk manajemen routing dan navigasi deklaratif ketika aplikasi bertumbuh menjadi multi‑screen yang lebih kompleks.
-- **Dartz** – direncanakan untuk tipe fungsional seperti `Either`, `Option`, dsb., agar hasil operasi (sukses/gagal) dapat dimodelkan eksplisit di domain layer.
 
 Library yang \"direncanakan\" akan diadopsi secara bertahap sesuai kebutuhan fitur (tidak semuanya harus diaktifkan sekaligus di awal).
+
+### Routing (GoRouter)
+
+Navigasi aplikasi memakai **go_router**. Semua path dan nama route didefinisikan di satu tempat agar konsisten dan bisa deep-link.
+
+- **Konfigurasi**: `lib/core/router/app_router.dart` — `createAppRouter()` mengembalikan `GoRouter`; dipakai di `main.dart` lewat `MaterialApp.router(routerConfig: _goRouter)`.
+- **Konstanta path**: class `AppRoutes` di file yang sama mendefinisikan path string (mis. `AppRoutes.peoples`, `AppRoutes.personForm`). **Gunakan konstanta ini** saat memanggil `context.push(...)` / `context.go(...)`; jangan hardcode path string di widget.
+- **Shell (tab bar)**: `StatefulShellRoute.indexedStack` dengan 4 branch — Home, Peoples, Tree, Settings. Tab dipilih lewat `StatefulNavigationShell.goBranch(index)`; path per tab: `/home`, `/peoples`, `/tree`, `/settings`. Lokasi awal: `/peoples`. Redirect: `/` atau path kosong → `/peoples`.
+- **Route full-screen** (di luar shell, pakai root navigator):
+  - **Person form**: `AppRoutes.personForm` (`/person/form`) = tambah orang; `AppRoutes.personEdit` (`/person/edit`) = edit orang. Untuk edit, navigasi dengan `context.push(AppRoutes.personEdit, extra: person)` (object `Person` dikirim lewat `extra`).
+  - **Dev Tools**: `AppRoutes.devtools` (`/devtools`) — dibuka lewat long-press di mana saja. Sub-rute: `AppRoutes.devtoolsDrift` (`/devtools/drift`), `AppRoutes.devtoolsDrift` + `/table/:tableName` untuk data tabel, `AppRoutes.devtoolsSharedPrefs` (`/devtools/shared-prefs`).
+- **Navigasi dari kode**:
+  - Pindah ke halaman penuh: `context.push(AppRoutes.personForm)` atau `context.push(AppRoutes.personEdit, extra: person)`.
+  - Kembali (pop): `context.pop()` atau `context.pop(true)` untuk mengembalikan nilai ke pemanggil.
+  - Jangan pakai `Navigator.of(context).push(MaterialPageRoute(...))` untuk route yang sudah didefinisikan di router; pakai `context.push(path)` / `context.go(path)`.
+- **Dialog**: dialog yang dibuka dengan `showDialog` tetap memakai `context.pop()` (atau `Navigator.of(context).pop()`) untuk menutup dialog; yang di-pop adalah overlay dialog, bukan route GoRouter.
 
 ---
 
@@ -206,6 +345,13 @@ Deskripsi singkat (bukan skema teknis final):
   - Atribut konseptual: `personId`, `provider`, `contactType` (phone, email, address, url, other), `value`, `label` (opsional, mis. Mobile/Home/Work), `providerContactId` (untuk dedup/sync).
   - DDL: `supports/data/contacts.ddl.sql`.
 
+- **`PersonRelation`** (relasi antar person — koneksi yang bisa dilepas-pasang)
+  - Satu person dapat punya banyak relasi: **orang tua**, **anak**, **pasangan**, **saudara**. Setiap relasi disimpan sebagai satu baris (personId, relatedPersonId, kind).
+  - **Kind**: `parent` (personId = orang tua, relatedPersonId = anak), `spouse`, `sibling`. Relasi bersifat eksplisit: tambah/lepas tidak mengubah data person, hanya koneksi.
+  - **Tambah relasi**: bisa **pilih orang yang sudah ada** di project atau **tambah orang baru** lalu hubungkan. UI: section "Relasi" di halaman edit person (form person); tombol "Tambah Relasi" → pilih jenis (Orang tua / Anak / Pasangan / Saudara) → "Pilih orang yang sudah ada" atau "Tambah orang baru lalu hubungkan".
+  - **Lepas relasi**: tombol lepas per entri; hanya menghapus baris relasi, person tetap ada di daftar.
+  - Tabel Drift: `PersonRelations` (`person_relations`); repository: `PersonRelationsRepository` (interface) + `PersonRelationsRepositoryImpl` (data); provider: `personRelationsRepositoryProvider`, `personRelationDisplaysStreamProvider(personId)`.
+
 Struktur ini dirancang agar:
 
 - Dapat dipetakan dengan jelas ke dan dari struktur GEDCOM (`INDI`, `FAM`, `SOUR`, dll).
@@ -278,6 +424,10 @@ Aplikasi memiliki 4 menu/tab utama:
     - Edit data individu.
     - Hapus individu (dengan konfirmasi dan pengecekan relasi).
     - Navigasi langsung ke tampilan **Tree** untuk individu yang dipilih.
+  - **Relasi person** (di halaman edit person):
+    - Relasi bersifat **koneksi yang bisa dilepas-pasang**: orang tua, anak, pasangan, saudara.
+    - Tambah relasi: pilih jenis (Orang tua / Anak / Pasangan / Saudara) lalu **pilih orang yang sudah ada** di project atau **tambah orang baru** lalu hubungkan.
+    - Lepas relasi: tombol lepas per entri; hanya menghapus koneksi, data person tidak berubah.
 - **Performa & UX**:
   - Dirancang untuk **data besar**:
     - Menggunakan **pagination** atau **virtual scrolling** agar scrolling tetap halus.
@@ -392,7 +542,7 @@ Untuk membantu proses pengembangan dan debugging, GEDHUB menyediakan halaman **D
 
 ## Prinsip Pengembangan Kode
 
-Pengembangan kode GEDHUB mengikuti prinsip berikut agar basis kode tetap konsisten, mudah dirawat, dan dapat dikembangkan jangka panjang.
+Pengembangan kode GEDHUB mengikuti prinsip berikut agar basis kode tetap konsisten, mudah dirawat, dan dapat dikembangkan jangka panjang. **AI agent harus mengacu ke [Panduan untuk AI Agent](#panduan-untuk-ai-agent)** untuk konteks pola, konvensi, dan enhancement yang berlaku di project ini.
 
 ### Don't Repeat Yourself (DRY)
 
@@ -403,8 +553,9 @@ Pengembangan kode GEDHUB mengikuti prinsip berikut agar basis kode tetap konsist
 ### Standar Kode
 
 - **Selalu menulis kode sesuai standar** yang berlaku di project (termasuk style guide Dart/Flutter, konvensi penamaan, dan aturan dari `analysis_options.yaml` / linter).
-- **Konsisten** dalam pola yang dipilih (mis. struktur folder feature-based, penggunaan Riverpod/Drift, pola repository).
+- **Konsisten** dalam pola yang dipilih (mis. struktur folder feature-based, penggunaan Riverpod/Drift, pola repository); rujuk contoh di `lib/features/projects/`, `lib/features/peoples/`, dan `lib/core/`.
 - **Dokumentasi singkat** untuk API publik, use case non-trivial, dan keputusan arsitektur yang penting.
+- **Enhance when editing**: saat mengubah file, perbaiki juga hal terkait yang konsisten dengan panduan (null-safety, tipe, reuse) selama tidak mengubah perilaku yang diharapkan.
 
 ### Komponen & Fungsi yang Dapat Dipakai Ulang (Shareable)
 
@@ -500,16 +651,16 @@ Dokumen ini mencatat kesesuaian implementasi saat ini dengan persyaratan di atas
 | **Fitur GEDCOM – Import** | Import file .ged, validasi, ringkasan | ❌ Belum (placeholder) |
 | **Fitur GEDCOM – Export** | Ekspor basis data aktif ke .ged | ❌ Belum (placeholder) |
 | **Tab Home** | Create, Import, Export + daftar project & pilih project aktif | ✅ Create + list project + switch project |
-| **Tab Peoples** | Daftar individu, search/filter, tambah/edit/hapus | ❌ Placeholder (belum ada tabel Person) |
+| **Tab Peoples** | Daftar individu, search/filter, tambah/edit/hapus, relasi | ✅ Daftar person, CRUD person, filter chip, CRUD kontak per person, relasi (orang tua, anak, pasangan, saudara) — tambah/lepas; pilih orang ada atau tambah orang baru |
 | **Tab Tree** | Visual pohon keluarga, zoom/pan, node klik | ❌ Placeholder |
 | **Tab Settings** | Placeholder untuk pengaturan | ✅ Sesuai (placeholder) |
 | **Model data – Project** | Tabel project di storage | ✅ Drift tabel `projects` |
-| **Model data – Person/Family/Event** | Entitas utama untuk silsilah | ❌ Belum (hanya DDL di `supports/`, belum tabel Drift) |
-| **Offline-first** | Semua data utama lokal | ⚠️ Sebagian (baru project; orang/keluarga/event belum) |
+| **Model data – Person/Family/Contact/Place/Relation** | Entitas utama untuk silsilah | ✅ Drift tabel `persons`, `families`, `contacts`, `places`, `person_relations`; model domain Person, Contact, PersonRelation |
+| **Offline-first** | Semua data utama lokal | ⚠️ Sebagian (project + person + contact; family/event belum terpakai penuh) |
 | **UI shadcn-style** | Tema, Card, Input, border, radius | ✅ Tema + komponen konsisten |
 | **Dev Tools** | Akses long-press, Drift Inspector, Shared Prefs | ✅ Terpenuhi (long-press, list tools, inspector tabel + row detail) |
 
-**Ringkasan gap:** Import/Export GEDCOM belum diimplementasikan; Peoples dan Tree masih placeholder karena model Person/Family/Event belum ada di database; storage baru dipakai untuk project, belum untuk data silsilah penuh.
+**Ringkasan gap:** Import/Export GEDCOM belum diimplementasikan; Tree masih placeholder; storage sudah dipakai untuk project, person, dan contact; tabel family/place ada di Drift namun integrasi penuh (UI/flow) belum.
 
 ---
 

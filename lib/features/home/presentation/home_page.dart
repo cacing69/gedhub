@@ -284,27 +284,32 @@ class HomePage extends HookConsumerWidget {
 
     if (confirmed != true) return;
 
-    try {
-      final deleted = await repo.deleteProject(project.id);
-      if (currentId == project.id) {
-        ref.read(currentProjectIdProvider.notifier).select(null);
-      }
-      if (scaffoldContext.mounted) {
-        ScaffoldMessenger.of(scaffoldContext).showSnackBar(
-          SnackBar(
-            content: Text(
-              deleted ? 'Project "${project.name}" telah dihapus.' : 'Gagal menghapus project.',
+    final result = await repo.deleteProject(project.id);
+    result.fold(
+      (f) {
+        if (scaffoldContext.mounted) {
+          ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+            SnackBar(content: Text('Gagal menghapus: ${f.message}')),
+          );
+        }
+      },
+      (deleted) {
+        if (currentId == project.id) {
+          ref.read(currentProjectIdProvider.notifier).select(null);
+        }
+        if (scaffoldContext.mounted) {
+          ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+            SnackBar(
+              content: Text(
+                deleted
+                    ? 'Project "${project.name}" telah dihapus.'
+                    : 'Gagal menghapus project.',
+              ),
             ),
-          ),
-        );
-      }
-    } catch (error) {
-      if (scaffoldContext.mounted) {
-        ScaffoldMessenger.of(scaffoldContext).showSnackBar(
-          SnackBar(content: Text('Gagal menghapus project: $error')),
-        );
-      }
-    }
+          );
+        }
+      },
+    );
   }
 }
 
@@ -390,24 +395,22 @@ class _CreateProjectFormContent extends HookConsumerWidget {
                     final name = nameController.text.trim();
                     final description = descriptionController.text.trim();
                     final locale = localeController.text.trim();
-                    try {
-                      final newId = await repo.createProject(
-                        name: name,
-                        description:
-                            description.isEmpty ? null : description,
-                        locale: locale.isEmpty ? null : locale,
-                      );
-                      if (!context.mounted) return;
-                      Navigator.of(dialogContext).pop();
-                      onSuccess(newId);
-                    } catch (error) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Gagal membuat project: $error'),
-                        ),
-                      );
-                    }
+                    final result = await repo.createProject(
+                      name: name,
+                      description:
+                          description.isEmpty ? null : description,
+                      locale: locale.isEmpty ? null : locale,
+                    );
+                    if (!context.mounted) return;
+                    result.fold(
+                      (f) => ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Gagal membuat project: ${f.message}')),
+                      ),
+                      (newId) {
+                        Navigator.of(dialogContext).pop();
+                        onSuccess(newId);
+                      },
+                    );
                   },
                   child: const Text('Create'),
                 ),
@@ -508,25 +511,25 @@ class _EditProjectFormContent extends HookConsumerWidget {
                     final name = nameController.text.trim();
                     final description = descriptionController.text.trim();
                     final locale = localeController.text.trim();
-                    try {
-                      final updated = await repo.updateProject(
-                        project.id,
-                        name: name,
-                        description:
-                            description.isEmpty ? null : description,
-                        locale: locale.isEmpty ? null : locale,
-                      );
-                      if (!context.mounted) return;
-                      Navigator.of(dialogContext).pop();
-                      if (updated) onSaved();
-                    } catch (error) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
+                    final result = await repo.updateProject(
+                      project.id,
+                      name: name,
+                      description:
+                          description.isEmpty ? null : description,
+                      locale: locale.isEmpty ? null : locale,
+                    );
+                    if (!context.mounted) return;
+                    result.fold(
+                      (f) => ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Gagal memperbarui project: $error'),
+                          content: Text('Gagal memperbarui: ${f.message}'),
                         ),
-                      );
-                    }
+                      ),
+                      (updated) {
+                        Navigator.of(dialogContext).pop();
+                        if (updated) onSaved();
+                      },
+                    );
                   },
                   child: const Text('Save'),
                 ),

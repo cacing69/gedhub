@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:gedhub/features/devtools/presentation/drift_table_data_page.dart';
+import 'package:gedhub/core/router/app_router.dart';
+import 'package:go_router/go_router.dart';
 
 /// Daftar tabel Drift yang bisa di-inspect.
 /// Tap tabel → tampilan data compact (database explorer).
 class DriftInspectorPage extends StatelessWidget {
   const DriftInspectorPage({super.key});
 
-  /// Tabel yang tersedia di AppDatabase (sesuaikan bila ada tabel baru).
+  /// Tabel yang tersedia di AppDatabase (sesuai skema di app_database.dart).
   static const List<String> _tableNames = [
     'projects',
-    // 'persons', 'families', dll. nanti
+    'persons',
+    'families',
+    'contacts',
+    'places',
+    'person_relations',
   ];
 
   @override
@@ -39,13 +44,7 @@ class DriftInspectorPage extends StatelessWidget {
               ),
               title: Text(tableName),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => DriftTableDataPage(tableName: tableName),
-                  ),
-                );
-              },
+              onTap: () => context.push('${AppRoutes.devtoolsDrift}/table/$tableName'),
             ),
           ),
         ],
